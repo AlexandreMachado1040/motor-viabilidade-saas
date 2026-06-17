@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { DEMO_MODE } from "../config";
 
 // Módulos que já possuem front próprio (navegação privada).
 const FRONTS: Record<string, string> = {
@@ -15,6 +16,7 @@ export function DashboardPage() {
         <div>
           <strong>Motor de Viabilidade</strong>
           <span className="muted"> · painel</span>
+          {DEMO_MODE && <span className="tag-admin" style={{ marginLeft: 8 }}>modo demonstração</span>}
         </div>
         <div className="perfil">
           {usuario?.picture && <img src={usuario.picture} alt="" className="avatar" />}
