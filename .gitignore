@@ -1,0 +1,43 @@
+# ── Segredos e ambiente ──────────────────────────────────────────────────────
+**/.env
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# ── Banco de dados local ─────────────────────────────────────────────────────
+*.db
+*.sqlite3
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ── Node / frontend ──────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# ── Cloudflare / Wrangler ────────────────────────────────────────────────────
+.wrangler/
+
+# ── Material de referência pesado (bancos Access acima do limite do GitHub) ──
+.docs/*.accdb
+
+# ── SO / editores ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Artefatos do tsc -b
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

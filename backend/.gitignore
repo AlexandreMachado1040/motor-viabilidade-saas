@@ -1,0 +1,12 @@
+# Segredos e banco local
+.env
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Alembic (mantemos versions/, ignoramos caches)
+*.pyc

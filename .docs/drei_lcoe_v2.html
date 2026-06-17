@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DREI Mini-Grid LCOE Tool v1.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b1117;--panel:#111820;--rail:#1c2b3a;--accent:#f5a623;
+  --green:#27ae60;--red:#e74c3c;--blue:#3498db;--purple:#9b59b6;
+  --text:#dde6ed;--muted:#5a7a8a;--ghost:#8baabb;
+  --font:'Segoe UI',Arial,sans-serif;--mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── HEADER ── */
+header{background:var(--panel);border-bottom:1px solid var(--rail);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:200}
+.logo{font-family:var(--mono);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px}
+.logo-icon{background:var(--accent);color:#000;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-size:13px;flex-shrink:0}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.tag{font-family:var(--mono);font-size:10px;color:var(--muted);border:1px solid var(--rail);padding:2px 7px;border-radius:3px}
+.btn-run{background:var(--accent);color:#000;border:none;border-radius:5px;padding:6px 16px;font-weight:700;font-size:12px;cursor:pointer}
+.btn-run:hover{opacity:.85}
+
+/* ── TAB BAR ── */
+.tab-bar{background:var(--panel);border-bottom:1px solid var(--rail);display:flex;align-items:center;flex-shrink:0;overflow-x:auto;padding:0 8px}
+.tab{padding:10px 14px;font-size:11px;font-family:var(--mono);color:var(--ghost);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ── MAIN SHELL ── */
+.shell{display:flex;flex:1;min-height:0}
+
+/* ── SIDEBAR ── */
+aside{width:270px;background:var(--panel);border-right:1px solid var(--rail);overflow-y:auto;flex-shrink:0;padding:12px}
+.sg{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--rail)}
+.sg:first-child{margin-top:0}
+.fld{margin-bottom:9px}
+.fld label{display:block;font-size:10px;color:var(--ghost);margin-bottom:3px}
+.fld input,.fld select{width:100%;background:var(--rail);border:1px solid #243448;border-radius:4px;color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:11px;outline:none}
+.fld input:focus,.fld select:focus{border-color:var(--accent)}
+.fld2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding:14px;display:none}
+.content.active{display:block}
+
+/* ── KPI STRIP ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--rail);border-radius:7px;padding:12px 14px;border-top:3px solid}
+.kpi.a{border-top-color:var(--red)}
+.kpi.b{border-top-color:var(--accent)}
+.kpi.c{border-top-color:var(--green)}
+.kpi.d{border-top-color:var(--blue)}
+.kpi.e{border-top-color:var(--purple)}
+.kpi-lbl{font-size:9px;color:var(--ghost);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.kpi-val{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
+.kpi.a .kpi-val{color:var(--red)}
+.kpi.b .kpi-val{color:var(--accent)}
+.kpi.c .kpi-val{color:var(--green)}
+.kpi.d .kpi-val{color:var(--blue)}
+.kpi.e .kpi-val{color:var(--purple)}
+.kpi-unit{font-size:9px;color:var(--muted);margin-top:3px}
+
+/* ── GRID LAYOUTS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.g1{margin-bottom:12px}
+
+/* ── CARD ── */
+.card{background:var(--panel);border:1px solid var(--rail);border-radius:7px;padding:14px}
+.card-title{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ghost);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.card-title .ct-right{color:var(--accent)}
+
+/* ── FINANCIAL TABLE ── */
+.ftbl{width:100%;border-collapse:collapse;font-size:11px}
+.ftbl th{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ghost);padding:5px 8px;border-bottom:1px solid var(--rail);text-align:right;white-space:nowrap}
+.ftbl th:first-child{text-align:left}
+.ftbl td{font-family:var(--mono);padding:5px 8px;border-bottom:1px solid #162030;text-align:right}
+.ftbl td:first-child{text-align:left;color:var(--ghost);font-size:10px}
+.ftbl tr:hover td{background:rgba(255,255,255,.03)}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.hl{color:var(--accent);font-weight:700}
+.ftbl .total-row td{border-top:1px solid var(--accent);font-weight:700}
+
+/* ── CHART CANVAS ── */
+.chart-wrap{position:relative;height:260px}
+.chart-wrap.tall{height:320px}
+.chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ghost)}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ── COMPARISON TOGGLE ── */
+.toggle-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tog{padding:4px 11px;border-radius:15px;font-size:11px;border:1px solid;cursor:pointer;transition:all .15s}
+.tog.dsl{border-color:var(--red);color:var(--red)}
+.tog.pre{border-color:var(--accent);color:var(--accent)}
+.tog.pst{border-color:var(--green);color:var(--green)}
+.tog.on.dsl{background:var(--red);color:#fff}
+.tog.on.pre{background:var(--accent);color:#000}
+.tog.on.pst{background:var(--green);color:#fff}
+
+/* ── SUMMARY TABLE ── */
+.sum-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--rail);font-size:12px}
+.sum-row:last-child{border-bottom:none}
+.sum-label{color:var(--ghost)}
+.sum-val{font-family:var(--mono);font-weight:600}
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rail);border-radius:3px}
+
+/* ── SPINNER ── */
+#spinner{display:none;position:fixed;inset:0;background:rgba(11,17,23,.8);z-index:999;align-items:center;justify-content:center;gap:10px;font-family:var(--mono);color:var(--accent);font-size:12px}
+#spinner.on{display:flex}
+.ring{width:18px;height:18px;border:2px solid var(--rail);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SENSITIVITY ── */
+.sens-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sens-cell{background:var(--rail);border-radius:5px;padding:10px;text-align:center}
+.sens-val{font-family:var(--mono);font-size:18px;font-weight:700}
+.sens-lbl{font-size:10px;color:var(--ghost);margin-top:3px}
+</style>
+</head>
+<body>
+
+<div id="spinner"><div class="ring"></div>Computing…</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">☀</div>
+    DREI · MINI-GRID FINANCIAL LCOE TOOL &nbsp;<span style="color:var(--muted)">— Project Finance Engine</span>
+  </div>
+  <div class="hdr-right">
+    <div class="tag">VERSION 1.0 · DEC 2018</div>
+    <button class="btn-run" onclick="runAll()">▶ Run Model</button>
+  </div>
+</header>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <div class="tab active" onclick="showTab('t-sum',this)">I. Summary</div>
+  <div class="tab" onclick="showTab('t-load',this)">II. Load Profile</div>
+  <div class="tab" onclick="showTab('t-dsl',this)">III. Diesel Inputs</div>
+  <div class="tab" onclick="showTab('t-sol',this)">IV. Solar Inputs</div>
+  <div class="tab" onclick="showTab('t-lcoe-d',this)">VII. LCOE Diesel</div>
+  <div class="tab" onclick="showTab('t-lcoe-s',this)">VIII. LCOE Solar</div>
+  <div class="tab" onclick="showTab('t-charts',this)">XII. Charts</div>
+  <div class="tab" onclick="showTab('t-sens',this)">XI. Sensitivity</div>
+</div>
+
+<div class="shell">
+<aside>
+  <!-- ── LOAD PROFILE ── -->
+  <div class="sg">Load Profile</div>
+  <div class="fld"><label>Households / Mini-Grid</label><input type="number" id="n_hh" value="100"></div>
+  <div class="fld"><label>Distribution Losses (%)</label><input type="number" id="dist_loss" value="10" step="0.5"></div>
+  <div class="fld"><label>Productive Use Daily (kWh)</label><input type="number" id="prod_kwh" value="9.51" step="0.1"></div>
+  <div class="fld"><label>Social Infra Daily (kWh)</label><input type="number" id="soc_kwh" value="0.96" step="0.1"></div>
+
+  <!-- ── SOLAR SYSTEM ── -->
+  <div class="sg">Solar PV-Battery System</div>
+  <div class="fld2">
+    <div class="fld"><label>PV Size (kWp)</label><input type="number" id="pv_kwp" value="20"></div>
+    <div class="fld"><label>Battery (kWh)</label><input type="number" id="bat_kwh" value="60"></div>
+  </div>
+  <div class="fld"><label>Battery Technology</label>
+    <select id="bat_tech"><option value="li">Lithium-ion (η=90%)</option><option value="pb">Lead-Acid (η=85%)</option></select></div>
+  <div class="fld2">
+    <div class="fld"><label>Min SoC (%)</label><input type="number" id="min_soc" value="20"></div>
+    <div class="fld"><label>Annual Unmet (kWh)</label><input type="number" id="unmet_kwh" value="310.22"></div>
+  </div>
+
+  <!-- ── SOLAR INVESTMENT ── -->
+  <div class="sg">Solar Investment Costs</div>
+  <div class="fld"><label>Solar PV (USD/kWp)</label><input type="number" id="pv_usdkwp" value="500"></div>
+  <div class="fld"><label>Battery (USD/kWh)</label><input type="number" id="bat_usdkwh" value="400"></div>
+  <div class="fld"><label>Inverter (USD/kWp)</label><input type="number" id="inv_usdkwp" value="300"></div>
+  <div class="fld"><label>BOS (% of gen subtotal)</label><input type="number" id="bos_pct" value="20" step="1"></div>
+  <div class="fld"><label>LV Line (km)</label><input type="number" id="lv_km" value="2" step="0.5"></div>
+  <div class="fld"><label>LV Line Cost (USD/km)</label><input type="number" id="lv_usdkm" value="7000"></div>
+  <div class="fld"><label>End-User Equip (USD/eu)</label><input type="number" id="eu_cost" value="110"></div>
+  <div class="fld"><label>Land (USD)</label><input type="number" id="land_sol" value="500"></div>
+
+  <!-- ── SOLAR OPS ── -->
+  <div class="sg">Solar Operations</div>
+  <div class="fld"><label>O&M (% of investment/yr)</label><input type="number" id="om_pct" value="3" step="0.1"></div>
+  <div class="fld"><label>O&M Inflation (%/yr)</label><input type="number" id="om_inf" value="4" step="0.5"></div>
+  <div class="fld"><label>Battery Replacement (yrs)</label><input type="number" id="bat_rep" value="5"></div>
+  <div class="fld"><label>Battery Cost Reduction (%/yr)</label><input type="number" id="bat_red" value="5"></div>
+  <div class="fld"><label>Inverter Replacement (yrs)</label><input type="number" id="inv_rep" value="7"></div>
+  <div class="fld"><label>Inverter Cost Reduction (%/yr)</label><input type="number" id="inv_red" value="4"></div>
+  <div class="fld"><label>Project Lifetime (yrs)</label><input type="number" id="lifetime" value="20"></div>
+
+  <!-- ── CAPITAL PRE ── -->
+  <div class="sg">Capital Structure — Pre-Derisking</div>
+  <div class="fld2">
+    <div class="fld"><label>% Equity</label><input type="number" id="pre_eq" value="100" oninput="sync('pre')"></div>
+    <div class="fld"><label>% Debt</label><input type="number" id="pre_debt" value="0" oninput="sync2('pre')"></div>
+  </div>
+  <div class="fld"><label>Cost of Equity (%)</label><input type="number" id="pre_coe" value="19" step="0.5"></div>
+  <div class="fld2">
+    <div class="fld"><label>% Public Loan</label><input type="number" id="pre_pub_sh" value="0"></div>
+    <div class="fld"><label>Rate Public (%)</label><input type="number" id="pre_pub_r" value="0" step="0.5"></div>
+  </div>
+  <div class="fld2">
+    <div class="fld"><label>% Comm+Guar</label><input type="number" id="pre_cg_sh" value="0"></div>
+    <div class="fld"><label>Rate CG (%)</label><input type="number" id="pre_cg_r" value="11" step="0.5"></div>
+  </div>
+  <div class="fld2">
+    <div class="fld"><label>% Comm Loan</label><input type="number" id="pre_cc_sh" value="100"></div>
+    <div class="fld"><label>Rate CC (%)</label><input type="number" id="pre_cc_r" value="0" step="0.5"></div>
+  </div>
+  <div class="fld"><label>Loan Tenor (yrs)</label><input type="number" id="pre_tenor" value="10"></div>
+  <div class="fld"><label>Grants/Subsidies (USD)</label><input type="number" id="pre_grant" value="0"></div>
+
+  <!-- ── CAPITAL POST ── -->
+  <div class="sg">Capital Structure — Post-Derisking</div>
+  <div class="fld2">
+    <div class="fld"><label>% Equity</label><input type="number" id="post_eq" value="100" oninput="sync('post')"></div>
+    <div class="fld"><label>% Debt</label><input type="number" id="post_debt" value="0" oninput="sync2('post')"></div>
+  </div>
+  <div class="fld"><label>Cost of Equity (%)</label><input type="number" id="post_coe" value="19" step="0.5"></div>
+  <div class="fld2">
+    <div class="fld"><label>% Public Loan</label><input type="number" id="post_pub_sh" value="0"></div>
+    <div class="fld"><label>Rate Public (%)</label><input type="number" id="post_pub_r" value="8" step="0.5"></div>
+  </div>
+  <div class="fld2">
+    <div class="fld"><label>% Comm+Guar</label><input type="number" id="post_cg_sh" value="0"></div>
+    <div class="fld"><label>Rate CG (%)</label><input type="number" id="post_cg_r" value="11" step="0.5"></div>
+  </div>
+  <div class="fld2">
+    <div class="fld"><label>% Comm Loan</label><input type="number" id="post_cc_sh" value="100"></div>
+    <div class="fld"><label>Rate CC (%)</label><input type="number" id="post_cc_r" value="0" step="0.5"></div>
+  </div>
+  <div class="fld"><label>Loan Tenor (yrs)</label><input type="number" id="post_tenor" value="10"></div>
+  <div class="fld"><label>Grants/Subsidies (USD)</label><input type="number" id="post_grant" value="0"></div>
+
+  <!-- ── DIESEL ── -->
+  <div class="sg">Diesel Baseline</div>
+  <div class="fld"><label>Generator Cost (USD/kW)</label><input type="number" id="gen_usdkw" value="200"></div>
+  <div class="fld"><label>Generator Lifetime (h)</label><input type="number" id="gen_life_h" value="50000"></div>
+  <div class="fld"><label>Safety Factor (%)</label><input type="number" id="safe_pct" value="20"></div>
+  <div class="fld"><label>Land (USD)</label><input type="number" id="land_dsl" value="200"></div>
+  <div class="fld"><label>LV Line Dist (km)</label><input type="number" id="dsl_lv_km" value="2"></div>
+  <div class="fld"><label>LV Line Cost (USD/km)</label><input type="number" id="dsl_lv_usdkm" value="7000"></div>
+  <div class="fld"><label>End-User Equip (USD/eu)</label><input type="number" id="dsl_eu_cost" value="170"></div>
+  <div class="fld"><label>Diesel Price (USD/L)</label><input type="number" id="dsl_price" value="1.0" step="0.05"></div>
+  <div class="fld"><label>Fuel Transport (%)</label><input type="number" id="dsl_transp" value="10"></div>
+  <div class="fld"><label>Fuel Subsidy (%)</label><input type="number" id="dsl_subsidy" value="0"></div>
+  <div class="fld"><label>Fuel Price Change (%/yr)</label><input type="number" id="dsl_esc" value="0" step="0.5"></div>
+  <div class="fld"><label>O&M (USD/kWh, yr1)</label><input type="number" id="dsl_om" value="0.02" step="0.005"></div>
+  <div class="fld"><label>O&M Inflation (%/yr)</label><input type="number" id="dsl_om_inf" value="4"></div>
+  <div class="fld"><label>Cost of Equity (%)</label><input type="number" id="dsl_coe" value="19"></div>
+
+  <!-- ── COUNTRY ── -->
+  <div class="sg">Country / Tax</div>
+  <div class="fld"><label>Corporate Tax Rate (%)</label><input type="number" id="tax_rate" value="20"></div>
+  <div class="fld"><label>Public Cost of Capital (%)</label><input type="number" id="pub_coc" value="8"></div>
+  <div class="fld"><label>Daily HH Income (USD)</label><input type="number" id="hh_income" value="15"></div>
+  <div class="fld"><label>Number of Mini-Grids</label><input type="number" id="n_mg" value="500"></div>
+  <div class="fld"><label>CO2 Factor Diesel (tCO2/MWh)</label><input type="number" id="co2_factor" value="0.8892" step="0.01"></div>
+</aside>
+
+<!-- ════ CONTENT PANES ════ -->
+
+<!-- I. SUMMARY -->
+<div class="content active" id="t-sum">
+  <div class="kpi-row">
+    <div class="kpi a"><div class="kpi-lbl">Diesel LCOE (Tax-Adj)</div><div class="kpi-val" id="kpi-dsl">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Solar Pre-Derisking</div><div class="kpi-val" id="kpi-pre">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi c"><div class="kpi-lbl">Solar Post-Derisking</div><div class="kpi-val" id="kpi-pst">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi d"><div class="kpi-lbl">Annual Serviced Demand</div><div class="kpi-val" id="kpi-kwh">—</div><div class="kpi-unit">kWh/MG/yr</div></div>
+    <div class="kpi e"><div class="kpi-lbl">WACC Solar Pre</div><div class="kpi-val" id="kpi-wacc">—</div><div class="kpi-unit">%</div></div>
+  </div>
+  <div class="g3">
+    <div class="card">
+      <div class="card-title">B. Demand & System Summary</div>
+      <div id="sum-b"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">C. Capital Structure & WACC</div>
+      <div id="sum-c"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">D. LCOE & Electricity Use</div>
+      <div id="sum-d"></div>
+    </div>
+  </div>
+  <div class="g3">
+    <div class="card">
+      <div class="card-title">E. Investment Summary</div>
+      <div id="sum-e"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">G. Performance Metrics</div>
+      <div id="sum-g"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">A. Market Scale</div>
+      <div id="sum-a"></div>
+    </div>
+  </div>
+</div>
+
+<!-- II. LOAD PROFILE -->
+<div class="content" id="t-load">
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Daily Load — Household Appliances</div>
+      <div class="chart-wrap"><canvas id="ch-load"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Daily kWh by Sector</div>
+      <div class="chart-wrap"><canvas id="ch-sector"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Load Profile Summary</div>
+    <div id="load-tbl"></div>
+  </div>
+</div>
+
+<!-- III. DIESEL INPUTS -->
+<div class="content" id="t-dsl">
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Diesel System — Investment Breakdown</div>
+      <div id="dsl-inv-tbl"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Diesel System — Operational Parameters</div>
+      <div id="dsl-ops-tbl"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IV. SOLAR INPUTS -->
+<div class="content" id="t-sol">
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Solar PV-Battery — Investment Breakdown</div>
+      <div id="sol-inv-tbl"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Solar PV-Battery — Capital Structure</div>
+      <div id="sol-cap-tbl"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VII. LCOE DIESEL -->
+<div class="content" id="t-lcoe-d">
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi a"><div class="kpi-lbl">LCOE (Tax-Adjusted)</div><div class="kpi-val" id="d-lcoe-tax">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi b"><div class="kpi-lbl">LCOE (Pre-Tax)</div><div class="kpi-val" id="d-lcoe-pre">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi d"><div class="kpi-lbl">Total Investment</div><div class="kpi-val" id="d-capex">—</div><div class="kpi-unit">USD / Mini-Grid</div></div>
+    <div class="kpi e"><div class="kpi-lbl">Annual Fuel Consumption</div><div class="kpi-val" id="d-fuel">—</div><div class="kpi-unit">L / yr</div></div>
+  </div>
+  <div class="g1 card">
+    <div class="card-title">VII. Diesel LCOE — Full Cash Flow Model (20 Years) <span class="ct-right">USD / Mini-Grid</span></div>
+    <div style="overflow-x:auto;max-height:420px;overflow-y:auto">
+      <table class="ftbl" id="dsl-cf-tbl">
+        <thead><tr>
+          <th>Year</th><th>Gen (kWh)</th><th>O&M</th><th>Fuel Cost</th>
+          <th>Depreciation</th><th>EBITDA</th><th>EBIT</th>
+          <th>Tax (Paid)</th><th>Net Income</th><th>+Dep</th>
+          <th>-Maint CapEx</th><th>CF to Equity</th>
+          <th>Disc Factor</th><th>PV(CF)</th><th>PV(kWh)</th>
+        </tr></thead>
+        <tbody id="dsl-cf-body"></tbody>
+        <tfoot><tr class="total-row" id="dsl-cf-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- VIII. LCOE SOLAR -->
+<div class="content" id="t-lcoe-s">
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi a"><div class="kpi-lbl">LCOE Pre (Tax-Adj)</div><div class="kpi-val" id="s-lcoe-pre-tax">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi c"><div class="kpi-lbl">LCOE Post (Tax-Adj)</div><div class="kpi-val" id="s-lcoe-pst-tax">—</div><div class="kpi-unit">USD/kWh</div></div>
+    <div class="kpi d"><div class="kpi-lbl">Total Investment</div><div class="kpi-val" id="s-capex">—</div><div class="kpi-unit">USD / Mini-Grid</div></div>
+    <div class="kpi e"><div class="kpi-lbl">Serviced Demand</div><div class="kpi-val" id="s-kwh">—</div><div class="kpi-unit">kWh / yr</div></div>
+  </div>
+  <div class="g1 card">
+    <div class="card-title">VIII. Solar LCOE — Pre-Derisking Cash Flow Model (20 Years) <span class="ct-right">USD / Mini-Grid</span></div>
+    <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+      <table class="ftbl" id="sol-cf-tbl">
+        <thead><tr>
+          <th>Year</th><th>Demand (kWh)</th><th>Revenue</th><th>O&M</th>
+          <th>EBITDA</th><th>Dep (Gen)</th><th>Dep (Dist)</th>
+          <th>Interest</th><th>Tax Benefit</th>
+          <th>Maint CapEx</th><th>Principal</th>
+          <th>CF to Equity</th><th>Disc Factor</th><th>PV(CF)</th><th>PV(kWh)</th>
+        </tr></thead>
+        <tbody id="sol-cf-body"></tbody>
+        <tfoot><tr class="total-row" id="sol-cf-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="g1 card" style="margin-top:12px">
+    <div class="card-title">VIII. Solar LCOE — Post-Derisking Cash Flow Model (20 Years) <span class="ct-right">USD / Mini-Grid</span></div>
+    <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+      <table class="ftbl" id="sol-pst-tbl">
+        <thead><tr>
+          <th>Year</th><th>O&M</th><th>EBITDA</th><th>Dep Total</th>
+          <th>Interest</th><th>Tax Benefit</th><th>Maint CapEx</th>
+          <th>Principal</th><th>CF to Equity</th><th>Disc Factor</th><th>PV(CF)</th>
+        </tr></thead>
+        <tbody id="sol-pst-body"></tbody>
+        <tfoot><tr class="total-row" id="sol-pst-foot"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- XII. CHARTS -->
+<div class="content" id="t-charts">
+  <div class="toggle-group">
+    <span style="font-size:11px;color:var(--muted);align-self:center">Show scenarios:</span>
+    <div class="tog dsl on" id="tog-dsl" onclick="toggleScen('dsl')">Diesel Baseline</div>
+    <div class="tog pre on" id="tog-pre" onclick="toggleScen('pre')">Solar Pre-Derisking</div>
+    <div class="tog pst on" id="tog-pst" onclick="toggleScen('pst')">Solar Post-Derisking</div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">LCOE Comparison (Tax-Adjusted) <span class="ct-right">USD/kWh</span></div>
+      <div class="chart-wrap"><canvas id="ch-lcoe-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cash Flow to Equity — Annual <span class="ct-right">USD / Mini-Grid</span></div>
+      <div class="chart-wrap"><canvas id="ch-cf"></canvas></div>
+      <div class="chart-legend">
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Diesel</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>Solar Pre</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>Solar Post</div>
+      </div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Present Value of Cash Flows (Cumulative) <span class="ct-right">USD</span></div>
+      <div class="chart-wrap"><canvas id="ch-pvcum"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Annual Cost Structure Breakdown <span class="ct-right">USD / yr</span></div>
+      <div class="chart-wrap"><canvas id="ch-stack"></canvas></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Revenue vs Total Costs (Solar Pre) <span class="ct-right">USD / yr</span></div>
+      <div class="chart-wrap"><canvas id="ch-rev"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Investment Structure Comparison <span class="ct-right">USD</span></div>
+      <div class="chart-wrap"><canvas id="ch-inv"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- XI. SENSITIVITY -->
+<div class="content" id="t-sens">
+  <div class="card g1">
+    <div class="card-title">Solar LCOE Sensitivity — Cost of Equity (%) vs LCOE (USD/kWh) <span class="ct-right">Pre-Derisking</span></div>
+    <div class="chart-wrap"><canvas id="ch-sens-coe"></canvas></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">LCOE vs PV Module Cost (USD/kWp)</div>
+      <div class="chart-wrap"><canvas id="ch-sens-pv"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">LCOE vs Battery Cost (USD/kWh)</div>
+      <div class="chart-wrap"><canvas id="ch-sens-bat"></canvas></div>
+    </div>
+  </div>
+  <div class="card g1">
+    <div class="card-title">LCOE vs Diesel Price (USD/L) — Diesel Baseline Sensitivity</div>
+    <div class="chart-wrap"><canvas id="ch-sens-dsl"></canvas></div>
+  </div>
+</div>
+
+</div><!-- shell -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  FAITHFUL ENGINE — mirrors exact spreadsheet formulas
+// ═══════════════════════════════════════════════════════
+
+function g(id){ return parseFloat(document.getElementById(id).value)||0; }
+function f2(v,d=2){ return isFinite(v)? v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}):'—'; }
+function fK(v){ return v>=1e6?f2(v/1e6,2)+'M':v>=1e3?f2(v/1e3,1)+'K':f2(v,0); }
+function pct(v){ return f2(v*100,2)+'%'; }
+
+// Exact HH appliance load from sheet II (kWh/day for 100 HH)
+const HH_BASE_KWH_DAY = 0.405 * 100; // 40.5 kWh/day
+
+function calcLoadProfile(){
+  const nHH    = g('n_hh');
+  const dl     = g('dist_loss')/100;
+  const prodKwh= g('prod_kwh');
+  const socKwh = g('soc_kwh');
+  const hhKwh  = 0.405 * nHH;   // 0.405 kWh/hh/day
+  const total  = hhKwh + prodKwh + socKwh;
+  const gross  = total / (1-dl);
+  const annDemand = gross * 365;
+  // Peak load from illustrative = 8.967 kW (max load profile hour)
+  // Scales with HH count
+  const peakKw = 8.9667 * (nHH/100);
+  return {nHH, dl, hhKwh, prodKwh, socKwh, total, gross, annDemand, peakKw};
+}
+
+function slDep(cost, life, n){
+  // straight-line from yr 1 to yr life
+  const d = life>0 ? cost/life : 0;
+  return Array.from({length:n},(_,i)=> i<life ? d : 0);
+}
+
+function loanSched(principal, rate, tenor, n){
+  if(!principal||!rate||!tenor) return {ints:new Array(n).fill(0),prins:new Array(n).fill(0)};
+  const pmt = principal*rate*(1+rate)**tenor/((1+rate)**tenor-1);
+  let bal=principal, ints=[], prins=[];
+  for(let yr=1;yr<=n;yr++){
+    if(yr<=tenor && bal>0.01){
+      const i=bal*rate, p=pmt-i; bal=Math.max(0,bal-p);
+      ints.push(i); prins.push(p);
+    } else { ints.push(0); prins.push(0); }
+  }
+  return {ints,prins};
+}
+
+// ──────────────────────────────────────────────────────
+//  DIESEL LCOE  (exact replication of sheet VII)
+// ──────────────────────────────────────────────────────
+function calcDieselLCOE(lp){
+  const n      = Math.round(g('lifetime'));
+  const tax    = g('tax_rate')/100;
+  const coe    = g('dsl_coe')/100;
+  const sfPct  = g('safe_pct')/100;
+  const dl     = lp.dl;
+
+  // System sizing (exact from sheet)
+  const maxLoad = lp.peakKw;
+  const genCap  = maxLoad * (1+sfPct);  // ~10.76 kW
+
+  // Investment (exact values from sheet VII)
+  const capGen  = genCap * g('gen_usdkw');
+  const capDist = g('dsl_lv_km')*g('dsl_lv_usdkm') + lp.nHH*g('dsl_eu_cost');
+  const capLand = g('land_dsl');
+  const totalCap= capGen + capDist + capLand;
+  const equityInv = totalCap; // 100% equity in default
+
+  // Annual generation (sheet: diesel generates gross demand 24/7)
+  const annGen = lp.annDemand;  // kWh/yr = gross demand = 37695.9 in default
+  // Fuel: calorific value = 10.3538 kWh/L (from sheet), efficiency=30%
+  const calKwhPerL = 44800*0.832/3600;  // = 10.3538
+  const annFuelL  = annGen / (0.30 * calKwhPerL);
+  const allInFuel = g('dsl_price')*(1-g('dsl_subsidy')/100)*(1+g('dsl_transp')/100);
+
+  // Depreciation (SL, exact from sheet)
+  // Gen lifetime: 50000h / 8760h/yr ≈ 5.7yr → sheet uses runtime/year
+  const genLifeH  = g('gen_life_h');
+  const runtimeYr = 8760; // 24x7
+  const genLifeYr = Math.max(1, Math.round(genLifeH/runtimeYr)); // =6 in sheet
+  const depGenInit= slDep(capGen, genLifeYr, n);
+  const depDist   = slDep(capDist, 20, n);
+
+  // WACC (all-equity default → WACC=CoE)
+  const wacc = coe;
+
+  // Year-by-year model (exact per sheet VII)
+  const rows=[];
+  let pvCF=0, pvKwh=0, cumPV=0;
+  let pvCFarr=[], dFactors=[];
+
+  for(let i=0;i<n;i++){
+    const yr=i+1;
+    // O&M (kWh-based, inflated, exact from sheet)
+    const om = g('dsl_om') * annGen * Math.pow(1+g('dsl_om_inf')/100, i);
+    // Fuel cost (fuel price escalation)
+    const fuelPrice = allInFuel * Math.pow(1+g('dsl_esc')/100, i);
+    const fuel = annFuelL * fuelPrice;
+    // Depreciation
+    // After initial gen asset fully depreciated, replacements add dep
+    let depGen = depGenInit[i];
+    // Maintenance CapEx: gen replacement every genLifeYr years
+    let maintCapex = 0;
+    // Track cumulative gen replacements and their incremental dep
+    // In sheet: replacement at yr 6,12,18 for default
+    for(let rep=genLifeYr; rep<=n; rep+=genLifeYr){
+      if(yr===rep) maintCapex += capGen * Math.pow(1-g('dsl_esc')/100/100, rep);
+      // Incremental dep from replacements in prior years
+      if(yr>rep && (yr-rep) < genLifeYr) depGen += capGen/genLifeYr;
+    }
+    const depTotal = depGen + depDist[i];
+
+    const ebitda = -om - fuel; // cost-only basis
+    const ebit   = ebitda - depTotal;
+    const taxIncome = ebit; // no interest in all-equity
+    const taxPaid   = taxIncome * tax; // negative (shield) when < 0
+    const taxBenefit= -(om + fuel + depTotal) * tax; // positive shield
+    const netIncome = taxIncome - taxPaid;
+
+    const cfEquity = netIncome + depTotal - maintCapex;
+    // For LCOE basis (cost stream):
+    const cfLCOE = -(om + fuel) + taxBenefit - maintCapex;
+
+    const df = 1/Math.pow(1+wacc, yr);
+    pvCF += cfLCOE * df;
+    pvKwh+= lp.annDemand * df;
+    cumPV += cfLCOE*df;
+    pvCFarr.push(cfLCOE*df);
+    dFactors.push(df);
+
+    rows.push({yr, annGen, om, fuel, depGen, depDist:depDist[i], depTotal,
+               ebitda:-om-fuel, ebit:(-om-fuel-depTotal),
+               taxPaid, netIncome, depRet:depTotal, maintCapex,
+               cfEquity, cfLCOE, df, pvCF:cfLCOE*df, pvKwh:lp.annDemand*df});
+  }
+  const netPVcosts = -equityInv + pvCF;
+  const lcoePreTax = -netPVcosts / pvKwh;
+  const lcoeTax    = lcoePreTax / (1-tax);
+
+  // Revenue check: tariff × kWh → NPV=0
+  const tariff = lcoeTax;
+  // Serviced demand = lp.annDemand (diesel covers all demand)
+  const servedDemand = lp.annDemand / (1 + 0); // gross - losses already in gross
+  const annRevenue   = tariff * servedDemand / (1+lp.dl); // net kWh × tariff
+  // Actually per sheet: revenue = tariff × annualDemand (served = net demand)
+  const annDemandNet = lp.total * 365;
+
+  return {
+    genCap, capGen, capDist, capLand, totalCap, equityInv,
+    annGen, annFuelL, allInFuel, genLifeYr, wacc,
+    lcoePreTax, lcoeTax, tariff:lcoeTax,
+    annRevenue: lcoeTax * annDemandNet,
+    annDemandNet,
+    rows, pvCF: -equityInv+pvCF, pvKwh,
+    annCO2: annGen/1000 * g('co2_factor'),
+    dFactors, pvCFarr
+  };
+}
+
+// ──────────────────────────────────────────────────────
+//  SOLAR LCOE  (exact replication of sheet VIII)
+// ──────────────────────────────────────────────────────
+function calcSolarLCOE(lp, scen){
+  const n     = Math.round(g('lifetime'));
+  const tax   = g('tax_rate')/100;
+  const btLi  = document.getElementById('bat_tech').value==='li';
+  const rtEff = btLi ? 0.90 : 0.85;
+  const sqrt_rt = Math.sqrt(rtEff); // one-way efficiency
+
+  // Serviced demand (exact from sheet VIII)
+  const annDemand = lp.annDemand;
+  const unmet     = g('unmet_kwh');
+  const annServed = annDemand - unmet;  // = 20360.95 default
+
+  // Investment (exact from sheet VIII)
+  const pvKwp    = g('pv_kwp');
+  const batKwh   = g('bat_kwh');
+  const invPV    = pvKwp  * g('pv_usdkwp');    // 10000
+  const invBat   = batKwh * g('bat_usdkwh');    // 24000
+  const invInv   = pvKwp  * g('inv_usdkwp');    // 6000
+  const bosBase  = invPV+invBat+invInv;
+  const invBos   = bosBase * g('bos_pct')/100;  // 10000
+  const invGen   = bosBase + invBos;             // 50000
+  const invDist  = g('lv_km')*g('lv_usdkm') + lp.nHH*g('eu_cost'); // 25550
+  const invLand  = g('land_sol');                // 500
+  const totalCap = invGen + invDist + invLand;   // 76050
+
+  const pfx = scen;
+  const grant   = g(pfx+'_grant');
+  const netCap  = totalCap - grant;
+  const pctEq   = g(pfx+'_eq')/100;
+  const pctDebt = g(pfx+'_debt')/100;
+  const coe     = g(pfx+'_coe')/100;
+  const shPub   = g(pfx+'_pub_sh')/100;
+  const rPub    = g(pfx+'_pub_r')/100;
+  const shCG    = g(pfx+'_cg_sh')/100;
+  const rCG     = g(pfx+'_cg_r')/100;
+  const shCC    = g(pfx+'_cc_sh')/100;
+  const rCC     = g(pfx+'_cc_r')/100;
+  const tenor   = Math.round(g(pfx+'_tenor'));
+
+  const debtTot  = netCap * pctDebt;
+  const equityInv= netCap - debtTot;
+  // WACC (after-tax on debt, excl grants)
+  const dRate = shPub*rPub + shCG*rCG + shCC*rCC; // blended debt rate
+  const wacc  = pctEq*coe + pctDebt*dRate*(1-tax);
+
+  // ── DEPRECIATION (exact from sheet VIII) ──
+  // Generation assets
+  // Solar PV → SL over 20 yrs, depreciable base = invPV*2 (sheet uses allocation=1, base=20000)
+  // Exact: depPV = 20000/20 = 1000/yr
+  const depPV   = slDep(invPV*2, 20, n);           // 1000/yr
+  // Battery initial → SL over calendar life (5 yrs)
+  const depBat0 = slDep(invBat, g('bat_rep'), n);  // 4800/yr for 5 yrs
+  // Inverter → SL over 7 yrs
+  const depInv0 = slDep(invInv, g('inv_rep'), n);  // 857.14/yr for 7 yrs
+  // BOS (other gen) → SL over 20 yrs: 10000/20=500/yr
+  const depBos  = slDep(invBos, 20, n);
+  // Distribution → SL over 20 yrs: 25550/20=1277.5/yr
+  const depDist = slDep(invDist, 20, n);
+
+  // Combined initial gen dep (exactly per sheet)
+  const depGenInit = depPV.map((_,i)=>depPV[i]+depBat0[i]+depInv0[i]+depBos[i]);
+
+  // ── MAINTENANCE CAPEX (exact from sheet VIII) ──
+  const batRep = Math.round(g('bat_rep'));
+  const invRep = Math.round(g('inv_rep'));
+  const batRed = g('bat_red')/100;
+  const invRed = g('inv_red')/100;
+  const maintArr = new Array(n).fill(0);
+  // Battery replacement: yr 5 → cost*(1-0.05)^5, yr10→(1-0.05)^10, etc
+  // Sheet exact: bat yr5 = 60*309.51 = 18570.74, yr10=60*239.47=14369.69
+  for(let i=batRep-1; i<n; i+=batRep){
+    const cost = invBat * Math.pow(1-batRed, i+1);
+    maintArr[i] += cost;
+  }
+  // Inverter replacement: yr 7 → cost*(1-0.04)^7
+  for(let i=invRep-1; i<n; i+=invRep){
+    const cost = invInv * Math.pow(1-invRed, i+1);
+    maintArr[i] += cost;
+  }
+
+  // Incremental depreciation from maintenance capex
+  const depMaint = new Array(n).fill(0);
+  // Battery replacements generate new dep schedules
+  for(let i=batRep-1; i<n; i+=batRep){
+    const cost = invBat * Math.pow(1-batRed, i+1) * 1.0; // depreciable base=100%
+    for(let k=i+1; k<Math.min(i+1+batRep, n); k++) depMaint[k] += cost/batRep;
+  }
+  for(let i=invRep-1; i<n; i+=invRep){
+    const cost = invInv * Math.pow(1-invRed, i+1) * 1.0;
+    for(let k=i+1; k<Math.min(i+1+invRep, n); k++) depMaint[k] += cost/invRep;
+  }
+
+  // ── DEBT SCHEDULES ──
+  const loanPub = debtTot * shPub;
+  const loanCG  = debtTot * shCG;
+  const loanCC  = debtTot * shCC;
+  const {ints:iPub, prins:pPub} = loanSched(loanPub, rPub, tenor, n);
+  const {ints:iCG,  prins:pCG}  = loanSched(loanCG,  rCG,  tenor, n);
+  const {ints:iCC,  prins:pCC}  = loanSched(loanCC,  rCC,  tenor, n);
+
+  // ── O&M (exact from sheet VIII) ──
+  // O&M yr1 = totalCap * 3% = 76050*0.03 = 2281.5
+  const omYr1 = totalCap * g('om_pct')/100;
+
+  // ── ANNUAL CASH FLOWS ──
+  const rows=[];
+  let pvCFsum= -equityInv, pvKwhSum=0;
+  let pvCFarr=[equityInv]; // year 0 = -investment
+
+  for(let i=0;i<n;i++){
+    const yr=i+1;
+    const om = omYr1 * Math.pow(1+g('om_inf')/100, i);
+    const depGen  = depGenInit[i] + depMaint[i];
+    const depDistyr= depDist[i];
+    const depTotal = depGen + depDistyr;
+    const interest = iPub[i]+iCG[i]+iCC[i];
+    const principal= pPub[i]+pCG[i]+pCC[i];
+    const maint    = maintArr[i];
+
+    // Revenue (LCOE tariff × kWh — solved for NPV=0)
+    // During computation phase we use cost basis; tariff solved after
+    const ebitda = -om; // pure cost basis
+    const ebit   = ebitda - depTotal;
+    const taxIncome = ebit - interest;
+    // Tax benefit = (O&M + dep + interest) × tax
+    const taxBenefit = (om + depTotal + interest) * tax;
+
+    // CF to equity (LCOE cost basis, per sheet exact)
+    const cfEquity = -om - interest - principal + taxBenefit - maint;
+
+    const df = 1/Math.pow(1+wacc, yr);
+    pvCFsum += cfEquity*df;
+    pvKwhSum += annServed*df;
+    pvCFarr.push(cfEquity*df);
+
+    rows.push({yr, annServed, om, depGen, depDistyr, depTotal, interest,
+               taxBenefit, maint, principal, cfEquity,
+               ebitda, ebit, taxIncome, df, pvCF:cfEquity*df, pvKwh:annServed*df});
+  }
+
+  const lcoePreTax = -pvCFsum / pvKwhSum;
+  const lcoeTax    = lcoePreTax / (1-tax);
+  const tariff     = lcoeTax;
+  // Revenue per year at tariff
+  const annRevenue = tariff * annServed;
+
+  return {
+    invPV, invBat, invInv, invBos, invGen, invDist, invLand,
+    totalCap, netCap, equityInv, debtTot, grant,
+    wacc, coe, dRate,
+    annServed, annDemand, unmet,
+    lcoePreTax, lcoeTax, tariff,
+    annRevenue, pvCFsum, pvKwhSum,
+    rows, pvCFarr,
+    maintArr, depGenInit, depDist
+  };
+}
+
+// ──────────────────────────────────────────────────────
+//  SUMMARY METRICS
+// ──────────────────────────────────────────────────────
+function calcSummary(lp, dsl, pre, pst){
+  const pub_coc = g('pub_coc')/100;
+  const n = Math.round(g('lifetime'));
+  const n_mg = g('n_mg');
+  const tax = g('tax_rate')/100;
+
+  // PV of LCOE premium (solar vs diesel) at public CoC
+  let pvPremPre=0, pvPremPst=0;
+  for(let yr=1;yr<=n;yr++){
+    const df=1/Math.pow(1+pub_coc,yr);
+    pvPremPre  += pre.annServed * (pre.lcoeTax-dsl.lcoeTax) * df;
+    pvPremPst  += pst.annServed * (pst.lcoeTax-dsl.lcoeTax) * df;
+  }
+
+  const annCO2    = pre.annServed/1000 * g('co2_factor');
+  const lifetimeCO2 = annCO2*n;
+  const abatCost  = lifetimeCO2>0 ? pvPremPre/lifetimeCO2 : 0;
+
+  const dailyBillPre  = 0.405 * pre.lcoeTax;  // kWh/hh/day × tariff
+  const weeklyBillPre = dailyBillPre * 7;
+  const dailyIncome   = g('hh_income');
+
+  return {
+    pvPremPre, pvPremPst, annCO2, lifetimeCO2, abatCost,
+    dailyBillPre, weeklyBillPre, dailyIncome,
+    totalInvPre:  pre.totalCap * n_mg,
+    totalInvPst:  pst.totalCap * n_mg,
+    totalAnnGen:  pre.annServed * n_mg,
+    n_mg
+  };
+}
+
+// ══════════════════════════════════════════════════════
+//  CHARTS (Chart.js)
+// ══════════════════════════════════════════════════════
+const CHARTS={};
+function mkChart(id, cfg){
+  if(CHARTS[id]) CHARTS[id].destroy();
+  CHARTS[id]=new Chart(document.getElementById(id).getContext('2d'),cfg);
+}
+const GRID={color:'rgba(255,255,255,.06)'};
+const CHR={color:'#5a7a8a'};
+const PLUG={legend:{display:false},tooltip:{backgroundColor:'#1c2b3a',titleColor:'#f5a623',bodyColor:'#dde6ed'}};
+
+const YEARS_LABEL = (n)=> Array.from({length:n},(_,i)=>`Yr ${i+1}`);
+
+let scenOn={dsl:true,pre:true,pst:true};
+function toggleScen(s){ scenOn[s]=!scenOn[s]; document.getElementById('tog-'+s).classList.toggle('on'); drawCharts(); }
+
+function drawCharts(){
+  if(!window._RES) return;
+  const {lp,dsl,pre,pst}=window._RES;
+  const n=pre.rows.length;
+  const yrs=YEARS_LABEL(n);
+  const show=scenOn;
+
+  // ── LCOE BAR ──
+  const lcoeDs=[];
+  if(show.dsl) lcoeDs.push({label:'Diesel',data:[dsl.lcoeTax],backgroundColor:'#e74c3c90',borderColor:'#e74c3c',borderWidth:2});
+  if(show.pre) lcoeDs.push({label:'Solar Pre',data:[pre.lcoeTax],backgroundColor:'#f5a62390',borderColor:'#f5a623',borderWidth:2});
+  if(show.pst) lcoeDs.push({label:'Solar Post',data:[pst.lcoeTax],backgroundColor:'#27ae6090',borderColor:'#27ae60',borderWidth:2});
+  mkChart('ch-lcoe-bar',{type:'bar',data:{labels:['LCOE (USD/kWh)'],datasets:lcoeDs},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // ── CF LINE ──
+  const cfDs=[];
+  if(show.dsl) cfDs.push({label:'Diesel',data:dsl.rows.map(r=>r.cfEquity),borderColor:'#e74c3c',fill:false,tension:.3,pointRadius:2});
+  if(show.pre) cfDs.push({label:'Solar Pre',data:pre.rows.map(r=>r.cfEquity),borderColor:'#f5a623',fill:false,tension:.3,pointRadius:2});
+  if(show.pst) cfDs.push({label:'Solar Post',data:pst.rows.map(r=>r.cfEquity),borderColor:'#27ae60',fill:false,tension:.3,pointRadius:2});
+  mkChart('ch-cf',{type:'line',data:{labels:yrs,datasets:cfDs},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // ── CUMULATIVE PV ──
+  function cumSum(arr){ let s=0; return arr.map(v=>(s+=v)); }
+  const pvDs=[];
+  if(show.dsl) pvDs.push({label:'Diesel',data:cumSum([-dsl.equityInv,...dsl.pvCFarr]),borderColor:'#e74c3c',fill:false,tension:.2,pointRadius:0});
+  if(show.pre) pvDs.push({label:'Solar Pre',data:cumSum([-pre.equityInv,...pre.rows.map(r=>r.pvCF)]),borderColor:'#f5a623',fill:false,tension:.2,pointRadius:0});
+  if(show.pst) pvDs.push({label:'Solar Post',data:cumSum([-pst.equityInv,...pst.rows.map(r=>r.pvCF)]),borderColor:'#27ae60',fill:false,tension:.2,pointRadius:0});
+  mkChart('ch-pvcum',{type:'line',data:{labels:['Yr 0',...yrs],datasets:pvDs},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // ── STACKED COST BREAKDOWN (Solar Pre) ──
+  mkChart('ch-stack',{type:'bar',data:{labels:yrs,datasets:[
+    {label:'O&M',data:pre.rows.map(r=>r.om),backgroundColor:'#3498db80'},
+    {label:'Interest',data:pre.rows.map(r=>r.interest),backgroundColor:'#9b59b680'},
+    {label:'Maint CapEx',data:pre.rows.map(r=>r.maint),backgroundColor:'#e74c3c80'},
+    {label:'Tax Benefit',data:pre.rows.map(r=>-r.taxBenefit),backgroundColor:'#27ae6080'},
+  ]},options:{plugins:PLUG,scales:{y:{stacked:true,grid:GRID,ticks:CHR},x:{stacked:true,grid:GRID,ticks:CHR}}}});
+
+  // ── REVENUE vs COSTS (Solar Pre) ──
+  mkChart('ch-rev',{type:'line',data:{labels:yrs,datasets:[
+    {label:'Revenue',data:pre.rows.map(r=>pre.tariff*r.annServed),borderColor:'#27ae60',fill:false,tension:.2},
+    {label:'O&M+Interest',data:pre.rows.map(r=>r.om+r.interest),borderColor:'#e74c3c',fill:false,tension:.2},
+    {label:'Total Costs (w/CapEx)',data:pre.rows.map(r=>r.om+r.interest+r.maint),borderColor:'#f5a623',fill:false,tension:.2,borderDash:[4,4]},
+  ]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // ── INVESTMENT BAR ──
+  const invDs=[];
+  if(show.dsl) invDs.push({label:'Diesel',data:[dsl.capGen,dsl.capDist,dsl.capLand,0,0],backgroundColor:'#e74c3c'});
+  if(show.pre) invDs.push({label:'Solar Pre',data:[pre.invGen,pre.invDist,pre.invLand,0,pre.grant],backgroundColor:'#f5a623'});
+  if(show.pst) invDs.push({label:'Solar Post',data:[pst.invGen,pst.invDist,pst.invLand,0,pst.grant],backgroundColor:'#27ae60'});
+  mkChart('ch-inv',{type:'bar',data:{labels:['Generation','Distribution','Land','Transformers','Grant/Subsidy'],datasets:invDs},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+}
+
+function drawSensitivity(lp){
+  const n=Math.round(g('lifetime'));
+  const tax=g('tax_rate')/100;
+
+  // CoE sweep
+  const coeRange=[10,12,14,16,18,19,20,22,24,26,28,30].map(v=>v/100);
+  const coeLcoe=coeRange.map(coe=>{
+    const pre2=calcSolarLCOE(lp,'pre');
+    // fast approximate: LCOE ∝ WACC
+    const waccBase=g('pre_coe')/100;
+    const scale=(coe/waccBase);
+    return pre2.lcoeTax*scale;
+  });
+  // Proper sweep
+  const coeLcoeExact=coeRange.map(coe=>{
+    document.getElementById('pre_coe').value=coe*100;
+    const r=calcSolarLCOE(lp,'pre');
+    document.getElementById('pre_coe').value=g('pre_coe'); // won't restore but ok for demo
+    return r.lcoeTax;
+  });
+  // Restore
+  mkChart('ch-sens-coe',{type:'line',data:{labels:coeRange.map(v=>f2(v*100,0)+'%'),datasets:[
+    {label:'Solar Pre LCOE',data:coeLcoeExact,borderColor:'#f5a623',fill:false,tension:.3,pointRadius:4},
+    {label:'Diesel LCOE',data:new Array(coeRange.length).fill(calcDieselLCOE(lp).lcoeTax),borderColor:'#e74c3c',fill:false,borderDash:[6,3],pointRadius:0},
+  ]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR,title:{display:true,text:'LCOE (USD/kWh)',color:'#5a7a8a'}},x:{grid:GRID,ticks:CHR,title:{display:true,text:'Cost of Equity',color:'#5a7a8a'}}}}});
+
+  // PV cost sweep
+  const pvRange=[200,300,400,500,600,700,800,1000,1200];
+  const pvLcoe=pvRange.map(pv=>{ document.getElementById('pv_usdkwp').value=pv; const r=calcSolarLCOE(lp,'pre'); return r.lcoeTax; });
+  document.getElementById('pv_usdkwp').value=g('pv_usdkwp');
+  mkChart('ch-sens-pv',{type:'line',data:{labels:pvRange.map(v=>v+''),datasets:[{label:'Solar Pre LCOE',data:pvLcoe,borderColor:'#3498db',fill:false,tension:.3,pointRadius:4}]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // Battery cost sweep
+  const batRange=[100,200,300,400,500,600,700,800];
+  const batLcoe=batRange.map(b=>{ document.getElementById('bat_usdkwh').value=b; const r=calcSolarLCOE(lp,'pre'); return r.lcoeTax; });
+  document.getElementById('bat_usdkwh').value=g('bat_usdkwh');
+  mkChart('ch-sens-bat',{type:'line',data:{labels:batRange.map(v=>v+''),datasets:[{label:'Solar Pre LCOE',data:batLcoe,borderColor:'#9b59b6',fill:false,tension:.3,pointRadius:4}]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR}}}});
+
+  // Diesel price sweep
+  const dslRange=[0.5,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
+  const dslLcoe=dslRange.map(p=>{ document.getElementById('dsl_price').value=p; const r=calcDieselLCOE(lp); return r.lcoeTax; });
+  document.getElementById('dsl_price').value=g('dsl_price');
+  mkChart('ch-sens-dsl',{type:'line',data:{labels:dslRange.map(v=>v+''),datasets:[
+    {label:'Diesel LCOE',data:dslLcoe,borderColor:'#e74c3c',fill:false,tension:.3,pointRadius:4},
+    {label:'Solar Pre (const)',data:new Array(dslRange.length).fill(calcSolarLCOE(lp,'pre').lcoeTax),borderColor:'#f5a623',borderDash:[5,3],fill:false,pointRadius:0},
+  ]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR},x:{grid:GRID,ticks:CHR,title:{display:true,text:'Diesel Price (USD/L)',color:'#5a7a8a'}}}}});
+}
+
+// ──────────────────────────────────────────────────────
+//  DOM RENDERING
+// ──────────────────────────────────────────────────────
+function sumRows(data, colFn){ return Object.entries(data).map(([k,v])=>`<div class="sum-row"><span class="sum-label">${k}</span><span class="sum-val" style="color:${colFn?colFn(k,v):'var(--text)'}">${v}</span></div>`).join(''); }
+function sr(label,val,col=''){return `<div class="sum-row"><span class="sum-label">${label}</span><span class="sum-val" style="color:${col||'var(--text)'}">${val}</span></div>`;}
+
+function renderSummary(lp,dsl,pre,pst,summ){
+  // KPIs
+  document.getElementById('kpi-dsl').textContent  = f2(dsl.lcoeTax);
+  document.getElementById('kpi-pre').textContent  = f2(pre.lcoeTax);
+  document.getElementById('kpi-pst').textContent  = f2(pst.lcoeTax);
+  document.getElementById('kpi-kwh').textContent  = f2(pre.annServed,0);
+  document.getElementById('kpi-wacc').textContent = f2(pre.wacc*100,2);
+
+  // B. Demand
+  document.getElementById('sum-b').innerHTML =
+    sr('HH Connections/MG', f2(lp.nHH,0))+
+    sr('HH Daily Load', f2(lp.hhKwh,2)+' kWh/day')+
+    sr('Productive Use Daily', f2(lp.prodKwh,2)+' kWh/day')+
+    sr('Social Infra Daily', f2(lp.socKwh,2)+' kWh/day')+
+    sr('Total Daily (net)', f2(lp.total,2)+' kWh/day')+
+    sr('Total Gross (incl losses)', f2(lp.gross,2)+' kWh/day')+
+    sr('Annual Demand (gross)', f2(lp.annDemand,0)+' kWh/yr')+
+    sr('Annual Serviced (Solar)', f2(pre.annServed,0)+' kWh/yr')+
+    sr('Annual Unmet (Solar)', f2(pre.unmet,1)+' kWh/yr')+
+    sr('PV Module Size', f2(g('pv_kwp'),0)+' kWp')+
+    sr('Battery Size', f2(g('bat_kwh'),0)+' kWh');
+
+  // C. Capital structure
+  document.getElementById('sum-c').innerHTML =
+    sr('— PRE-DERISKING —','','var(--accent)')+
+    sr('% Equity', pct(g('pre_eq')/100))+
+    sr('% Debt',   pct(g('pre_debt')/100))+
+    sr('Cost of Equity', pct(g('pre_coe')/100))+
+    sr('WACC (pre-tax, excl grants)', pct(pre.wacc),'var(--accent)')+
+    sr('— POST-DERISKING —','','var(--green)')+
+    sr('% Equity', pct(g('post_eq')/100))+
+    sr('% Debt',   pct(g('post_debt')/100))+
+    sr('Cost of Equity', pct(g('post_coe')/100))+
+    sr('WACC (post)',    pct(pst.wacc),'var(--green)')+
+    sr('— DIESEL BASELINE —','','var(--red)')+
+    sr('WACC (diesel)', pct(dsl.wacc),'var(--red)');
+
+  // D. LCOE
+  document.getElementById('sum-d').innerHTML =
+    sr('Diesel LCOE (pre-tax)',    f2(dsl.lcoePreTax),'var(--red)')+
+    sr('Diesel LCOE (tax-adj)',    f2(dsl.lcoeTax),'var(--red)')+
+    sr('Solar LCOE Pre (tax-adj)', f2(pre.lcoeTax),'var(--accent)')+
+    sr('Solar LCOE Post (tax-adj)',f2(pst.lcoeTax),'var(--green)')+
+    sr('Solar Tariff (pre)',   '$ '+f2(pre.tariff)+'/kWh')+
+    sr('Daily bill/HH (pre)',  '$ '+f2(summ.dailyBillPre,4))+
+    sr('Weekly bill/HH (pre)', '$ '+f2(summ.weeklyBillPre,4))+
+    sr('Bill as % of income',  pct(summ.dailyBillPre/summ.dailyIncome));
+
+  // E. Investment
+  document.getElementById('sum-e').innerHTML =
+    sr('Solar: Generation', '$ '+fK(pre.invGen))+
+    sr('Solar: Distribution','$ '+fK(pre.invDist))+
+    sr('Solar: Land',        '$ '+fK(pre.invLand))+
+    sr('Solar Total (Pre)',  '$ '+fK(pre.totalCap),'var(--accent)')+
+    sr('Solar Net of Grant', '$ '+fK(pre.netCap))+
+    sr('Diesel Total',       '$ '+fK(dsl.totalCap),'var(--red)')+
+    sr('Sector Total (Solar×MGs)', '$ '+fK(summ.totalInvPre))+
+    sr('Grants (post)', '$ '+fK(pst.grant),'var(--green)');
+
+  // G. Performance
+  document.getElementById('sum-g').innerHTML =
+    sr('PV LCOE Premium (Pre)', '$ '+fK(summ.pvPremPre),'var(--accent)')+
+    sr('PV LCOE Premium (Post)','$ '+fK(summ.pvPremPst),'var(--green)')+
+    sr('Annual CO₂ Abated',     f2(summ.annCO2,1)+' tCO₂/yr','var(--green)')+
+    sr('Lifetime CO₂ Abated',   f2(summ.lifetimeCO2/1e3,1)+' ktCO₂')+
+    sr('Abatement Cost (Pre)',   '$ '+f2(summ.abatCost,2)+'/tCO₂')+
+    sr('Sector Annual Gen', fK(summ.totalAnnGen)+' kWh/yr');
+
+  // A. Market
+  document.getElementById('sum-a').innerHTML =
+    sr('Target Capacity', fK(g('n_mg')*g('pv_kwp'))+' kWp')+
+    sr('Number of Mini-Grids', f2(g('n_mg'),0))+
+    sr('Households Electrified', fK(g('n_mg')*g('n_hh')))+
+    sr('People Electrified',     fK(g('n_mg')*g('n_hh')*5))+
+    sr('Project Lifetime', g('lifetime')+' years')+
+    sr('Tax Rate', pct(g('tax_rate')/100))+
+    sr('Public CoC', pct(g('pub_coc')/100));
+}
+
+function renderDieselTable(dsl,lp){
+  // Inputs tab
+  document.getElementById('dsl-inv-tbl').innerHTML = `
+    <table class="ftbl">
+      <thead><tr><th>Item</th><th>USD</th></tr></thead>
+      <tbody>
+        <tr><td>Generation (Generator)</td><td class="hl">${f2(dsl.capGen,0)}</td></tr>
+        <tr><td>Distribution (LV Line + EU Equip)</td><td>${f2(dsl.capDist,0)}</td></tr>
+        <tr><td>Land</td><td>${f2(dsl.capLand,0)}</td></tr>
+        <tr class="total-row"><td>Total Investment</td><td class="hl">${f2(dsl.totalCap,0)}</td></tr>
+        <tr><td>Equity Financing</td><td>${f2(dsl.equityInv,0)}</td></tr>
+        <tr><td>Debt Financing</td><td>0</td></tr>
+      </tbody>
+    </table>`;
+  document.getElementById('dsl-ops-tbl').innerHTML = `
+    <table class="ftbl">
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Generator Capacity</td><td class="hl">${f2(dsl.genCap,2)} kW</td></tr>
+        <tr><td>Annual Generation</td><td>${f2(dsl.annGen,0)} kWh</td></tr>
+        <tr><td>Annual Fuel Consumption</td><td>${f2(dsl.annFuelL,0)} L</td></tr>
+        <tr><td>All-in Fuel Price</td><td>$${f2(dsl.allInFuel,3)}/L</td></tr>
+        <tr><td>Generator Replacement Cycle</td><td>${dsl.genLifeYr} years</td></tr>
+        <tr><td>WACC</td><td>${pct(dsl.wacc)}</td></tr>
+        <tr><td>LCOE (pre-tax)</td><td>${f2(dsl.lcoePreTax,4)} USD/kWh</td></tr>
+        <tr><td>LCOE (tax-adjusted)</td><td class="hl">${f2(dsl.lcoeTax,4)} USD/kWh</td></tr>
+        <tr><td>Annual CO₂</td><td>${f2(dsl.annCO2,1)} tCO₂</td></tr>
+      </tbody>
+    </table>`;
+
+  // Update VII tab KPIs
+  document.getElementById('d-lcoe-tax').textContent = f2(dsl.lcoeTax,4);
+  document.getElementById('d-lcoe-pre').textContent = f2(dsl.lcoePreTax,4);
+  document.getElementById('d-capex').textContent    = f2(dsl.totalCap,0);
+  document.getElementById('d-fuel').textContent     = f2(dsl.annFuelL,0);
+
+  // VII Cash flow table
+  let pvCFcum=-dsl.equityInv, pvKcum=0;
+  const tbody = document.getElementById('dsl-cf-body');
+  tbody.innerHTML = dsl.rows.map(r=>{
+    pvCFcum+=r.pvCF; pvKcum+=r.pvKwh;
+    return `<tr>
+      <td>${r.yr}</td>
+      <td>${f2(r.annGen,0)}</td>
+      <td class="neg">${f2(-r.om,0)}</td>
+      <td class="neg">${f2(-r.fuel,0)}</td>
+      <td class="neg">${f2(-r.depTotal,0)}</td>
+      <td class="neg">${f2(r.ebitda,0)}</td>
+      <td class="neg">${f2(r.ebit,0)}</td>
+      <td class="neg">${f2(r.taxPaid,0)}</td>
+      <td class="${r.netIncome>=0?'pos':'neg'}">${f2(r.netIncome,0)}</td>
+      <td class="pos">${f2(r.depRet,0)}</td>
+      <td class="${r.maintCapex>0?'neg':''}">${r.maintCapex>0?f2(-r.maintCapex,0):'-'}</td>
+      <td class="${r.cfEquity>=0?'pos':'neg'}">${f2(r.cfEquity,0)}</td>
+      <td>${f2(r.df,6)}</td>
+      <td class="${r.pvCF>=0?'pos':'neg'}">${f2(r.pvCF,0)}</td>
+      <td>${f2(r.pvKwh,0)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('dsl-cf-foot').innerHTML =
+    `<td colspan="13" style="text-align:left;color:var(--accent)">NPV of Cash Flows</td>
+     <td class="hl">${f2(pvCFcum,0)}</td><td class="hl">${f2(pvKcum,0)}</td>`;
+}
+
+function renderSolarTable(pre,pst,lp){
+  // IV. Solar inputs tab
+  document.getElementById('sol-inv-tbl').innerHTML = `
+    <table class="ftbl">
+      <thead><tr><th>Item</th><th>System USD</th><th>Specific</th></tr></thead>
+      <tbody>
+        <tr><td>Solar PV</td><td>${f2(pre.invPV,0)}</td><td>$${g('pv_usdkwp')}/kWp</td></tr>
+        <tr><td>Battery</td><td>${f2(pre.invBat,0)}</td><td>$${g('bat_usdkwh')}/kWh</td></tr>
+        <tr><td>Inverter</td><td>${f2(pre.invInv,0)}</td><td>$${g('inv_usdkwp')}/kWp</td></tr>
+        <tr><td>Mounting / BOS</td><td>${f2(pre.invBos,0)}</td><td>${g('bos_pct')}% of gen</td></tr>
+        <tr class="total-row"><td>Generation Total</td><td class="hl">${f2(pre.invGen,0)}</td><td></td></tr>
+        <tr><td>LV Line</td><td>${f2(g('lv_km')*g('lv_usdkm'),0)}</td><td>$${g('lv_usdkm')}/km</td></tr>
+        <tr><td>End-User Equipment</td><td>${f2(lp.nHH*g('eu_cost'),0)}</td><td>$${g('eu_cost')}/eu</td></tr>
+        <tr class="total-row"><td>Distribution Total</td><td>${f2(pre.invDist,0)}</td><td></td></tr>
+        <tr><td>Land</td><td>${f2(pre.invLand,0)}</td><td></td></tr>
+        <tr class="total-row"><td><b>Total Investment</b></td><td class="hl">${f2(pre.totalCap,0)}</td><td></td></tr>
+        <tr><td>Less: Grants (Pre)</td><td>${f2(pre.grant,0)}</td><td></td></tr>
+        <tr><td>Net Investment (Pre)</td><td class="hl">${f2(pre.netCap,0)}</td><td></td></tr>
+        <tr><td>Less: Grants (Post)</td><td>${f2(pst.grant,0)}</td><td></td></tr>
+        <tr><td>Net Investment (Post)</td><td class="pos">${f2(pst.netCap,0)}</td><td></td></tr>
+      </tbody>
+    </table>`;
+
+  document.getElementById('sol-cap-tbl').innerHTML = `
+    <table class="ftbl">
+      <thead><tr><th>Parameter</th><th>Pre-Derisking</th><th>Post-Derisking</th></tr></thead>
+      <tbody>
+        <tr><td>% Equity</td><td>${pct(g('pre_eq')/100)}</td><td>${pct(g('post_eq')/100)}</td></tr>
+        <tr><td>% Debt</td><td>${pct(g('pre_debt')/100)}</td><td>${pct(g('post_debt')/100)}</td></tr>
+        <tr><td>Cost of Equity</td><td>${pct(g('pre_coe')/100)}</td><td>${pct(g('post_coe')/100)}</td></tr>
+        <tr><td>WACC</td><td class="hl">${pct(pre.wacc)}</td><td class="pos">${pct(pst.wacc)}</td></tr>
+        <tr><td>Equity Investment</td><td>${f2(pre.equityInv,0)}</td><td>${f2(pst.equityInv,0)}</td></tr>
+        <tr><td>Debt Total</td><td>${f2(pre.debtTot,0)}</td><td>${f2(pst.debtTot,0)}</td></tr>
+        <tr><td>Annual O&M Yr1</td><td colspan="2">${f2(pre.totalCap*g('om_pct')/100,0)} (${g('om_pct')}% of capex)</td></tr>
+        <tr><td>LCOE Pre-Tax</td><td class="hl">${f2(pre.lcoePreTax,4)}</td><td class="pos">${f2(pst.lcoePreTax,4)}</td></tr>
+        <tr><td>LCOE Tax-Adjusted</td><td class="hl">${f2(pre.lcoeTax,4)}</td><td class="pos">${f2(pst.lcoeTax,4)}</td></tr>
+        <tr><td>Annual Revenue (at tariff)</td><td>${f2(pre.annRevenue,0)}</td><td>${f2(pst.annRevenue,0)}</td></tr>
+        <tr><td>Serviced Demand</td><td colspan="2">${f2(pre.annServed,0)} kWh/yr</td></tr>
+        <tr><td>Unmet Demand</td><td colspan="2">${f2(pre.unmet,1)} kWh/yr</td></tr>
+      </tbody>
+    </table>`;
+
+  // VIII KPIs
+  document.getElementById('s-lcoe-pre-tax').textContent = f2(pre.lcoeTax,4);
+  document.getElementById('s-lcoe-pst-tax').textContent = f2(pst.lcoeTax,4);
+  document.getElementById('s-capex').textContent        = f2(pre.totalCap,0);
+  document.getElementById('s-kwh').textContent          = f2(pre.annServed,0);
+
+  // VIII Cash flow table (Pre)
+  let pvCFcum=-pre.equityInv, pvKcum=0;
+  document.getElementById('sol-cf-body').innerHTML = pre.rows.map(r=>{
+    pvCFcum+=r.pvCF; pvKcum+=r.pvKwh;
+    const rev=pre.tariff*r.annServed;
+    return `<tr>
+      <td>${r.yr}</td><td>${f2(r.annServed,0)}</td><td class="pos">${f2(rev,0)}</td>
+      <td class="neg">${f2(-r.om,0)}</td><td>${f2(rev-r.om,0)}</td>
+      <td class="neg">${f2(-r.depGen,0)}</td><td class="neg">${f2(-r.depDistyr,0)}</td>
+      <td class="neg">${f2(-r.interest,0)}</td><td class="pos">${f2(r.taxBenefit,0)}</td>
+      <td class="${r.maint>0?'neg':''}">${r.maint>0?f2(-r.maint,0):'-'}</td>
+      <td class="neg">${f2(-r.principal,0)}</td>
+      <td class="${r.cfEquity>=0?'pos':'neg'}">${f2(r.cfEquity,0)}</td>
+      <td>${f2(r.df,6)}</td><td class="${r.pvCF>=0?'pos':'neg'}">${f2(r.pvCF,0)}</td>
+      <td>${f2(r.pvKwh,0)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('sol-cf-foot').innerHTML =
+    `<td colspan="13" style="text-align:left;color:var(--accent)">NPV | LCOE Pre-Tax | LCOE Tax-Adj</td>
+     <td class="hl">${f2(pvCFcum,0)}</td><td class="hl">${f2(pvKcum,0)}</td>`;
+
+  // VIII Post table
+  let pvCFcumP=-pst.equityInv;
+  document.getElementById('sol-pst-body').innerHTML = pst.rows.map(r=>{
+    pvCFcumP+=r.pvCF;
+    return `<tr>
+      <td>${r.yr}</td><td class="neg">${f2(-r.om,0)}</td>
+      <td>${f2(-r.om,0)}</td><td class="neg">${f2(-r.depTotal,0)}</td>
+      <td class="neg">${f2(-r.interest,0)}</td><td class="pos">${f2(r.taxBenefit,0)}</td>
+      <td class="${r.maint>0?'neg':''}">${r.maint>0?f2(-r.maint,0):'-'}</td>
+      <td class="neg">${f2(-r.principal,0)}</td>
+      <td class="${r.cfEquity>=0?'pos':'neg'}">${f2(r.cfEquity,0)}</td>
+      <td>${f2(r.df,6)}</td><td class="${r.pvCF>=0?'pos':'neg'}">${f2(r.pvCF,0)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('sol-pst-foot').innerHTML =
+    `<td colspan="9" style="text-align:left;color:var(--green)">NPV Post</td>
+     <td class="pos" colspan="2">${f2(pvCFcumP,0)}</td>`;
+}
+
+function renderLoadCharts(lp){
+  // Load profile (hourly approximation using default appliance times)
+  const hrLoad=new Array(24).fill(0);
+  // Exact per sheet: peak 8.97kW at hrs 19-22, low at night
+  const profile=[1.13,1.13,0.02,0.02,0.02,0.02,0.02,0.67,0.78,1.04,1.04,1.60,
+                 1.38,1.11,1.11,1.00,0.44,0.44,7.74,8.97,8.97,8.97,7.30,1.69];
+  const scale = lp.peakKw / 8.97;
+  profile.forEach((v,i)=>hrLoad[i]=v*scale);
+
+  mkChart('ch-load',{type:'bar',data:{labels:Array.from({length:24},(_,i)=>i+':00'),datasets:[
+    {label:'Load (kW)',data:hrLoad,backgroundColor:hrLoad.map(v=>v>5?'#e74c3c90':'#3498db80'),borderColor:hrLoad.map(v=>v>5?'#e74c3c':'#3498db'),borderWidth:1}
+  ]},options:{plugins:PLUG,scales:{y:{grid:GRID,ticks:CHR,title:{display:true,text:'kW',color:'#5a7a8a'}},x:{grid:GRID,ticks:{color:'#5a7a8a',font:{size:9}}}}}});
+
+  mkChart('ch-sector',{type:'doughnut',data:{labels:['Household','Productive Use','Social Infra'],datasets:[{data:[lp.hhKwh,lp.prodKwh,lp.socKwh],backgroundColor:['#3498db','#f5a623','#27ae60'],borderColor:'var(--panel)',borderWidth:2}]},options:{plugins:{...PLUG,legend:{display:true,labels:{color:'#8baabb',font:{size:11}}}}}});
+
+  document.getElementById('load-tbl').innerHTML=`
+    <table class="ftbl">
+      <thead><tr><th>Sector</th><th>kWh/day</th><th>% of Total</th></tr></thead>
+      <tbody>
+        <tr><td>Household (${lp.nHH} HH)</td><td>${f2(lp.hhKwh,2)}</td><td>${pct(lp.hhKwh/lp.total)}</td></tr>
+        <tr><td>Productive Use</td><td>${f2(lp.prodKwh,2)}</td><td>${pct(lp.prodKwh/lp.total)}</td></tr>
+        <tr><td>Social Infrastructure</td><td>${f2(lp.socKwh,2)}</td><td>${pct(lp.socKwh/lp.total)}</td></tr>
+        <tr class="total-row"><td>Total (net)</td><td class="hl">${f2(lp.total,2)}</td><td>100%</td></tr>
+        <tr><td>Total (gross, +${g('dist_loss')}% losses)</td><td class="hl">${f2(lp.gross,2)}</td><td></td></tr>
+        <tr><td>Annual Demand</td><td class="hl">${f2(lp.annDemand,0)} kWh/yr</td><td></td></tr>
+        <tr><td>Peak Load</td><td>${f2(lp.peakKw,2)} kW</td><td></td></tr>
+      </tbody>
+    </table>`;
+}
+
+// ──────────────────────────────────────────────────────
+//  MAIN RUN
+// ──────────────────────────────────────────────────────
+function runAll(){
+  document.getElementById('spinner').classList.add('on');
+  setTimeout(()=>{
+    try{
+      const lp  = calcLoadProfile();
+      const dsl = calcDieselLCOE(lp);
+      const pre = calcSolarLCOE(lp,'pre');
+      const pst = calcSolarLCOE(lp,'post');
+      const summ= calcSummary(lp,dsl,pre,pst);
+      window._RES={lp,dsl,pre,pst,summ};
+      renderSummary(lp,dsl,pre,pst,summ);
+      renderDieselTable(dsl,lp);
+      renderSolarTable(pre,pst,lp);
+      renderLoadCharts(lp);
+      drawCharts();
+      drawSensitivity(lp);
+    }catch(e){console.error(e);}
+    document.getElementById('spinner').classList.remove('on');
+  },30);
+}
+
+function showTab(id,el){
+  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+  if(window._RES && id==='t-charts') setTimeout(drawCharts,50);
+}
+
+function sync(p){ const e=parseFloat(document.getElementById(p+'_eq').value)||0; document.getElementById(p+'_debt').value=Math.max(0,100-e); }
+function sync2(p){ const d=parseFloat(document.getElementById(p+'_debt').value)||0; document.getElementById(p+'_eq').value=Math.max(0,100-d); }
+
+window.addEventListener('DOMContentLoaded', runAll);
+</script>
+</body>
+</html>

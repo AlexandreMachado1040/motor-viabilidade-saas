@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motor de Viabilidade Híbrida — Preview das Abas</title>
+<style>
+:root {
+  --bg: #0e1117; --surface: #161b27; --panel: #1e2538;
+  --border: #2a3350; --teal: #00c6cf; --gold: #f5a623;
+  --green: #2ecc71; --red: #e74c3c; --purple: #a29bfe;
+  --blue: #4fa3e0; --muted: #7b8ab8; --text: #ccd6f6;
+  --white: #e8edf5; --mono: 'Courier New', monospace;
+  --radius: 8px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; min-height: 100vh; }
+
+/* ── TOP BAR ── */
+.topbar { background: #0a0d18; border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, var(--teal), #0096b7); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.logo-name { font-size: 15px; font-weight: 700; color: var(--white); }
+.logo-sub { font-size: 10px; color: var(--muted); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.badge { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+.badge-saas { background: rgba(0,198,207,0.12); border: 1px solid rgba(0,198,207,0.3); color: var(--teal); }
+.badge-beta { background: rgba(245,166,35,0.12); border: 1px solid rgba(245,166,35,0.3); color: var(--gold); }
+
+/* ── TAB BAR ── */
+.tabbar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; padding: 0 16px; gap: 0; scrollbar-width: none; }
+.tabbar::-webkit-scrollbar { display: none; }
+.tab { display: flex; align-items: center; gap: 7px; padding: 10px 16px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); font-size: 12px; font-weight: 500; position: relative; }
+.tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.tab.active { color: var(--white); border-bottom-color: var(--teal); background: rgba(0,198,207,0.05); }
+.tab.locked { opacity: 0.45; cursor: not-allowed; }
+.tab.locked:hover { color: var(--muted); background: none; }
+.tab-icon { font-size: 14px; }
+.tab-lock { font-size: 9px; color: var(--gold); position: absolute; top: 6px; right: 8px; }
+.tab-num { width: 18px; height: 18px; border-radius: 50%; background: var(--panel); display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--muted); font-weight: 700; }
+
+/* ── MAIN LAYOUT ── */
+.main { display: flex; height: calc(100vh - 96px); }
+.sidebar { width: 240px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ── SIDEBAR ── */
+.sb-section { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+.sb-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+.sb-module { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 3px; transition: background 0.12s; }
+.sb-module:hover { background: var(--panel); }
+.sb-module.active { background: rgba(0,198,207,0.1); border: 1px solid rgba(0,198,207,0.2); }
+.sb-module-left { display: flex; align-items: center; gap: 8px; }
+.sb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sb-name { font-size: 11.5px; color: var(--text); }
+.sb-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.sb-status { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+.s-free { background: rgba(46,204,113,0.12); color: var(--green); }
+.s-pro { background: rgba(245,166,35,0.12); color: var(--gold); }
+.s-prem { background: rgba(162,155,254,0.12); color: var(--purple); }
+.s-lock { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+/* ── CONTENT PANELS ── */
+.panel { display: none; }
+.panel.active { display: block; }
+.panel-header { margin-bottom: 20px; }
+.panel-title { font-size: 18px; font-weight: 700; color: var(--white); display: flex; align-items: center; gap: 10px; }
+.panel-desc { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.6; }
+.section-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700; margin: 20px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── CARDS ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+.card-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 12px; }
+
+/* ── GRID DE INPUTS ── */
+.input-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.input-field { display: flex; flex-direction: column; gap: 5px; }
+.input-label { font-size: 10.5px; color: var(--muted); }
+.input-val { background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px; font-size: 12px; color: var(--teal); font-family: var(--mono); font-weight: 600; }
+.input-val.editable { color: #4fa3e0; border-color: rgba(79,163,224,0.3); }
+.input-val.formula { color: var(--green); }
+.input-unit { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* ── MATRIX TABLE ── */
+.matrix-wrap { overflow-x: auto; margin-top: 8px; }
+.matrix-table { border-collapse: collapse; font-size: 10px; width: 100%; }
+.matrix-table th { background: var(--panel); color: var(--muted); font-weight: 600; padding: 5px 6px; text-align: center; border: 1px solid var(--border); white-space: nowrap; font-size: 9px; letter-spacing: 0.5px; }
+.matrix-table th.row-head { text-align: left; width: 50px; color: var(--text); }
+.matrix-table td { padding: 4px 6px; text-align: right; border: 1px solid rgba(255,255,255,0.04); font-family: var(--mono); color: #c8d4e8; white-space: nowrap; }
+.matrix-table td.row-label { text-align: left; color: var(--muted); font-family: inherit; font-weight: 600; background: var(--panel); }
+.matrix-table td.high-val { color: var(--gold); }
+.matrix-table td.zero { color: rgba(255,255,255,0.15); }
+.matrix-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* ── TARIFA TABLE ── */
+.tarifa-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.tarifa-table th { background: var(--panel); color: var(--muted); padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.tarifa-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+.tarifa-table td.val { font-family: var(--mono); color: var(--teal); font-weight: 600; text-align: right; }
+.tarifa-table td.ponta { color: var(--red); font-weight: 600; }
+.tarifa-table td.fp { color: var(--blue); }
+.tarifa-table tr:hover td { background: rgba(255,255,255,0.02); }
+.aneel-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(0,198,207,0.08); border: 1px solid rgba(0,198,207,0.2); border-radius: 4px; padding: 3px 9px; font-size: 10px; color: var(--teal); margin-bottom: 12px; }
+
+/* ── KPI ROW ── */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; }
+.kpi-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.kpi-val { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+.kpi-sub { font-size: 9px; color: var(--muted); margin-top: 3px; }
+
+/* ── TIMELINE BAR ── */
+.timeline { display: flex; align-items: center; gap: 4px; margin: 8px 0; overflow-x: auto; padding-bottom: 4px; }
+.tl-year { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 36px; }
+.tl-label { font-size: 8px; color: var(--muted); }
+.tl-bar { width: 32px; border-radius: 3px; transition: height 0.3s; }
+.tl-val { font-size: 8px; font-family: var(--mono); color: var(--muted); }
+
+/* ── CHART CONTAINER ── */
+.chart-area { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; position: relative; }
+canvas { width: 100% !important; max-height: 260px; }
+
+/* ── BESS SPEC TABLE ── */
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.spec-item { display: flex; flex-direction: column; gap: 3px; background: var(--panel); border-radius: 5px; padding: 8px 10px; border: 1px solid var(--border); }
+.spec-label { font-size: 10px; color: var(--muted); }
+.spec-val { font-size: 13px; font-family: var(--mono); color: var(--white); font-weight: 600; }
+.spec-unit { font-size: 9px; color: var(--muted); }
+
+/* ── CF TABLE ── */
+.cf-table { width: 100%; border-collapse: collapse; font-size: 10.5px; overflow-x: auto; display: block; }
+.cf-table th { background: var(--panel); color: var(--muted); padding: 6px 8px; text-align: center; border: 1px solid var(--border); font-size: 9px; font-weight: 700; white-space: nowrap; }
+.cf-table th.cat { text-align: left; min-width: 160px; }
+.cf-table td { padding: 5px 8px; border: 1px solid rgba(255,255,255,0.03); font-family: var(--mono); font-size: 10px; text-align: right; }
+.cf-table td.cat { text-align: left; color: var(--muted); font-family: inherit; background: rgba(255,255,255,0.01); }
+.cf-table tr.section-row td { background: var(--panel); color: var(--teal); font-weight: 700; font-family: inherit; }
+.neg { color: #e74c3c; }
+.pos { color: #2ecc71; }
+
+/* ── INDICADORES FINAIS ── */
+.ind-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.ind-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+.ind-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.ind-value { font-size: 24px; font-weight: 800; font-family: var(--mono); }
+.ind-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.ind-card.inviavel .ind-value { color: var(--red); }
+.ind-card.viavel .ind-value { color: var(--green); }
+.ind-card.neutro .ind-value { color: var(--teal); }
+.ind-card.gold .ind-value { color: var(--gold); }
+
+/* ── LOCKED OVERLAY ── */
+.locked-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; }
+.lock-icon { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
+.lock-title { font-size: 18px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+.lock-desc { font-size: 13px; color: var(--muted); max-width: 400px; line-height: 1.7; margin-bottom: 24px; }
+.btn-upgrade { background: linear-gradient(135deg, var(--teal), #0096b7); color: white; border: none; border-radius: 8px; padding: 11px 28px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.btn-upgrade:hover { opacity: 0.9; }
+.plan-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.plan-chip { padding: 4px 12px; border-radius: 16px; font-size: 11px; font-weight: 600; }
+
+/* ── ANEEL API STATUS ── */
+.api-status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 6px; background: rgba(245,166,35,0.07); border: 1px solid rgba(245,166,35,0.2); margin-bottom: 14px; }
+.api-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+.api-text { font-size: 11px; color: var(--gold); }
+.api-text span { color: var(--muted); font-weight: normal; }
+
+/* ── MODULE LICENSE PILLS ── */
+.lic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+.lic-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+.lic-left { display: flex; align-items: center; gap: 8px; }
+.lic-dot { width: 8px; height: 8px; border-radius: 50%; }
+.lic-label { font-size: 11.5px; color: var(--text); }
+.lic-plan { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-name">Motor de Viabilidade Híbrida</div>
+      <div class="logo-sub">Baseado em ESTUDO_DE_VIABILIDADE_Híbrido_27-06-2024</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="badge badge-saas">SaaS Modular</span>
+    <span class="badge badge-beta">v1.0 Preview</span>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tabbar" id="tabbar">
+  <div class="tab active" onclick="showTab('capa',this)"><span class="tab-icon">🏠</span>Capa</div>
+  <div class="tab" onclick="showTab('readme',this)"><span class="tab-icon">📋</span>Readme</div>
+  <div class="tab" onclick="showTab('load',this)"><span class="tab-icon">📊</span>Input – Load<span class="tab-num">1</span></div>
+  <div class="tab" onclick="showTab('grid',this)"><span class="tab-icon">⚡</span>Input – Grid<span class="tab-num">2</span></div>
+  <div class="tab" onclick="showTab('solar',this)"><span class="tab-icon">☀️</span>Input – Solar SCDEE<span class="tab-num">3</span></div>
+  <div class="tab" onclick="showTab('bess_ponta',this)"><span class="tab-icon">🔋</span>Input – BESS Ponta<span class="tab-num">4</span></div>
+  <div class="tab" onclick="showTab('gen_ponta',this)"><span class="tab-icon">🔧</span>Input – Gen. Ponta<span class="tab-num">5</span></div>
+  <div class="tab" onclick="showTab('gen_form',this)"><span class="tab-icon">⚙️</span>Input – Gen. Formador<span class="tab-num">6</span></div>
+  <div class="tab" onclick="showTab('bess_form',this)"><span class="tab-icon">🔋</span>Input – BESS Formador<span class="tab-num">7</span></div>
+  <div class="tab" onclick="showTab('new_grid',this)"><span class="tab-icon">🌐</span>Input – New Grid<span class="tab-num">8</span></div>
+  <div class="tab" onclick="showTab('cf',this)"><span class="tab-icon">📈</span>Fluxo de Caixa<span class="tab-num">9</span></div>
+  <div class="tab" onclick="showTab('comparacao',this)"><span class="tab-icon">🏆</span>Comparação Econômica</div>
+  <div class="tab" onclick="showTab('costsum',this)"><span class="tab-icon">💰</span>Cost Summary</div>
+  <div class="tab" onclick="showTab('gridzero',this)"><span class="tab-icon">⚡</span>Input – Grid Zero<span class="tab-num">GZ</span></div>
+  <div class="tab" onclick="showTab('licencas',this)"><span class="tab-icon">🔑</span>Licenças</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-title">Módulos do Motor</div>
+
+      <div class="sb-module active" onclick="showTab('load',document.querySelectorAll('.tab')[2])">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#2ecc71"></div>
+          <div><div class="sb-name">Input – Load</div><div class="sb-sub">Memória de massa</div></div>
+        </div>
+        <span class="sb-status s-free">Básico</span>
+      </div>
+      <div class="sb-module" onclick="showTab('grid',document.querySelectorAll('.tab')[3])">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#4fa3e0"></div>
+          <div><div class="sb-name">Input – Grid</div><div class="sb-sub">Tarifas ANEEL API</div></div>
+        </div>
+        <span class="sb-status s-free">Básico</span>
+      </div>
+      <div class="sb-module" onclick="showTab('solar',document.querySelectorAll('.tab')[4])">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#f5a623"></div>
+          <div><div class="sb-name">Solar SCDEE</div><div class="sb-sub">GD + SONDA/PVGIS/TMY</div></div>
+        </div>
+        <span class="sb-status s-pro">Profissional</span>
+      </div>
+      <div class="sb-module" onclick="showTab('bess_ponta',document.querySelectorAll('.tab')[5])">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#a29bfe"></div>
+          <div><div class="sb-name">BESS – Ponta</div><div class="sb-sub">Redução ponta tarifária</div></div>
+        </div>
+        <span class="sb-status s-pro">Profissional</span>
+      </div>
+      <div class="sb-module" onclick="showTab('gen_ponta',null)">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#e17055"></div>
+          <div><div class="sb-name">Gerador – Ponta</div><div class="sb-sub">Diesel ponta tarifária</div></div>
+        </div>
+        <span class="sb-status s-prem">Premium</span>
+      </div>
+      <div class="sb-module" onclick="showTab('gen_form',null)">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#fd79a8"></div>
+          <div><div class="sb-name">Gerador – Formador</div><div class="sb-sub">Off-grid / híbrido</div></div>
+        </div>
+        <span class="sb-status s-prem">Premium</span>
+      </div>
+      <div class="sb-module" onclick="showTab('bess_form',null)">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#6c5ce7"></div>
+          <div><div class="sb-name">BESS – Formador</div><div class="sb-sub">Grid-forming</div></div>
+        </div>
+        <span class="sb-status s-prem">Premium</span>
+      </div>
+      <div class="sb-module" onclick="showTab('new_grid',null)">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#00b894"></div>
+          <div><div class="sb-name">New Grid</div><div class="sb-sub">Nova rede elétrica</div></div>
+        </div>
+        <span class="sb-status s-prem">Premium</span>
+      </div>
+      <div class="sb-module" onclick="showTab('gridzero',null)">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#00cec9"></div>
+          <div><div class="sb-name">Grid Zero</div><div class="sb-sub">Sem injeção na rede</div></div>
+        </div>
+        <span class="sb-status s-pro">Profissional</span>
+      </div>
+      <div class="sb-module" onclick="showTab('cf',document.querySelectorAll('.tab')[10])">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#2ecc71"></div>
+          <div><div class="sb-name">Fluxo de Caixa</div><div class="sb-sub">TIR · VPL · Payback</div></div>
+        </div>
+        <span class="sb-status s-free">Básico</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Fontes Solarimetria</div>
+      <div class="sb-module">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#00c6cf"></div>
+          <div><div class="sb-name">SONDA/INPE</div><div class="sb-sub">Medido em campo</div></div>
+        </div>
+        <span class="sb-status s-pro">✓</span>
+      </div>
+      <div class="sb-module">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#4fa3e0"></div>
+          <div><div class="sb-name">PVGIS 5.2</div><div class="sb-sub">Satélite/reanálise</div></div>
+        </div>
+        <span class="sb-status s-pro">✓</span>
+      </div>
+      <div class="sb-module">
+        <div class="sb-module-left">
+          <div class="sb-dot" style="background:#a29bfe"></div>
+          <div><div class="sb-name">TMY Generator</div><div class="sb-sub">ISO 15927-4</div></div>
+        </div>
+        <span class="sb-status s-pro">✓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- CAPA -->
+    <div class="panel active" id="panel-capa">
+      <div class="panel-header">
+        <div class="panel-title">🏠 Base Line — Estudo de Viabilidade Híbrida</div>
+        <div class="panel-desc">Motor Python modular para análise econômica de sistemas híbridos de energia (Solar SCDEE, BESS, Geradores Diesel e Nova Rede). Cada módulo é licenciado individualmente como SaaS.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Demanda Máxima</div><div class="kpi-val" style="color:var(--red)">238,56</div><div class="kpi-sub">kW</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sistema Solar</div><div class="kpi-val" style="color:var(--gold)">300</div><div class="kpi-sub">kWp</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sistema BESS</div><div class="kpi-val" style="color:var(--purple)">1.598</div><div class="kpi-sub">kWh (DOD 80%)</div></div>
+        <div class="kpi-card"><div class="kpi-label">CAPEX Total</div><div class="kpi-val" style="color:var(--teal)">R$6,4M</div><div class="kpi-sub">Solar + BESS</div></div>
+        <div class="kpi-card"><div class="kpi-label">Horizonte</div><div class="kpi-val" style="color:var(--blue)">25</div><div class="kpi-sub">anos</div></div>
+        <div class="kpi-card"><div class="kpi-label">Concessionária</div><div class="kpi-val" style="color:var(--white);font-size:14px">Cemig-D</div><div class="kpi-sub">A4 Verde / 2023</div></div>
+      </div>
+      <div class="section-label">Arquitetura do Motor Python</div>
+      <div class="card">
+        <pre style="color:var(--text);font-family:var(--mono);font-size:11px;line-height:1.8">
+  motor_viabilidade.py
+  ├── LicencaModulos        ← controle de acesso por módulo (SaaS)
+  ├── ConfigAPIANEEL        ← autenticação OAuth2 Dynamics 365
+  ├── ClienteAPIANEEL       ← busca tarifas via OData + cache local
+  ├── InputLoad             ← MOD 1: memória de massa demanda/energia
+  ├── InputGrid             ← MOD 2: tarifas distribuidora + API ANEEL
+  ├── InputSolarSCDEE       ← MOD 3: GD GDII/GDIII + solarimetria integrada
+  ├── InputBESSPonta        ← MOD 4: bateria redução ponta
+  ├── InputGeradorPonta     ← MOD 5: gerador diesel ponta
+  ├── InputGeradorFormador  ← MOD 6: gerador grid-forming
+  ├── InputBESSFormador     ← MOD 7: BESS grid-forming
+  ├── SolarHibridoParams    ← Solar para sistemas híbridos
+  ├── InputNewGrid          ← MOD 8: nova rede elétrica
+  ├── ParamsCF              ← parâmetros econômicos (TMA, inflação, anos)
+  ├── CalculadoraOPEXGrid   ← OPEX baseline mensal/anual
+  ├── CalculadoraCF         ← FC nominal + descontado, VPL, TIR, Payback
+  ├── IntegradorSolarimetrico ← integra SONDA/PVGIS/TMY → matriz 12×24
+  └── EstudoViabilidade     ← orquestrador principal (módulo a módulo)
+
+  Módulos solarimétricos integrados:
+  ├── sonda_collector.py    ← Rede SONDA/INPE (21 estações)
+  ├── pvgis_collector.py    ← PVGIS 5.2 API REST (JRC/CE)
+  └── tmy_generator.py      ← TMY ISO 15927-4 (Finkelstein-Schafer)
+        </pre>
+      </div>
+    </div>
+
+    <!-- README -->
+    <div class="panel" id="panel-readme">
+      <div class="panel-header">
+        <div class="panel-title">📋 Readme — Instrução de Preenchimento</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Exportação de dados e correção de amostragem</div>
+        <table class="tarifa-table">
+          <thead><tr><th>Aba</th><th>Fonte de Dados</th><th>Módulo Python</th><th>Plano</th></tr></thead>
+          <tbody>
+            <tr><td>Input – Load</td><td>Memória de massa — resolução 15 min → 1h (demanda = máx, energia = soma)</td><td>InputLoad</td><td class="val"><span class="sb-status s-free">Básico</span></td></tr>
+            <tr><td>Input – Grid</td><td>Resolução homologatória vigente + <strong>API ANEEL Dynamics 365</strong></td><td>InputGrid + ClienteAPIANEEL</td><td class="val"><span class="sb-status s-free">Básico</span></td></tr>
+            <tr><td>Input – Solar SCDEE</td><td>PVSyst / SONDA / PVGIS / TMY + res. homologatória + Lei 14.300/2022</td><td>InputSolarSCDEE + IntegradorSolarimetrico</td><td class="val"><span class="sb-status s-pro">Pro</span></td></tr>
+            <tr><td>Input – BESS Ponta</td><td>Dados do fabricante (datasheet)</td><td>InputBESSPonta</td><td class="val"><span class="sb-status s-pro">Pro</span></td></tr>
+            <tr><td>Input – Gen. Ponta</td><td>Dados do fabricante (datasheet)</td><td>InputGeradorPonta</td><td class="val"><span class="sb-status s-prem">Premium</span></td></tr>
+            <tr><td>Input – Gen. Formador</td><td>Dados do fabricante</td><td>InputGeradorFormador</td><td class="val"><span class="sb-status s-prem">Premium</span></td></tr>
+            <tr><td>Input – BESS Formador</td><td>Dados do fabricante</td><td>InputBESSFormador</td><td class="val"><span class="sb-status s-prem">Premium</span></td></tr>
+            <tr><td>Input – New Grid</td><td>Custo de implantação de nova rede</td><td>InputNewGrid</td><td class="val"><span class="sb-status s-prem">Premium</span></td></tr>
+            <tr><td>CF / Comparação</td><td>Calculado automaticamente pelo motor</td><td>CalculadoraCF</td><td class="val"><span class="sb-status s-free">Básico</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INPUT LOAD -->
+    <div class="panel" id="panel-load">
+      <div class="panel-header">
+        <div class="panel-title">📊 Input – Load <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 1 · Plano Básico</span></div>
+        <div class="panel-desc">Memória de massa de demanda (kW) e energia (kWh) por posto tarifário. Resolução horária (agregação de 15 min → 1h).</div>
+      </div>
+      <div class="input-grid">
+        <div class="input-field"><div class="input-label">Demanda Máxima</div><div class="input-val editable">238,56</div><div class="input-unit">kW</div></div>
+        <div class="input-field"><div class="input-label">Energia Ponta Total</div><div class="input-val formula">51.300,06</div><div class="input-unit">kWh/ano</div></div>
+        <div class="input-field"><div class="input-label">Energia Fora Ponta Total</div><div class="input-val formula">214.995,06</div><div class="input-unit">kWh/ano</div></div>
+        <div class="input-field"><div class="input-label">Consumo Equivalente</div><div class="input-val formula">266.295,12</div><div class="input-unit">kWh/ano</div></div>
+      </div>
+      <div class="section-label">Memória de Massa — Demanda (kW) por Mês × Hora</div>
+      <div class="card">
+        <div class="matrix-wrap">
+          <table class="matrix-table" id="loadTable"></table>
+        </div>
+      </div>
+      <div class="section-label">Energia por Posto Tarifário (kWh/mês)</div>
+      <div class="card">
+        <table class="tarifa-table" id="energiaTable"></table>
+      </div>
+    </div>
+
+    <!-- INPUT GRID -->
+    <div class="panel" id="panel-grid">
+      <div class="panel-header">
+        <div class="panel-title">⚡ Input – Grid <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 2 · Plano Básico</span></div>
+        <div class="panel-desc">Tarifas e encargos da distribuidora. Integração com API ANEEL (Dynamics 365 / OData) para atualização automática de tarifas.</div>
+      </div>
+      <div class="api-status">
+        <div class="api-dot"></div>
+        <div class="api-text">API ANEEL <span>· Dynamics 365 CRM · OAuth2 (MSAL) · OData v4</span></div>
+      </div>
+      <div class="input-grid">
+        <div class="input-field"><div class="input-label">Concessionária</div><div class="input-val editable">Cemig-D</div></div>
+        <div class="input-field"><div class="input-label">Ano da Revisão</div><div class="input-val editable">2023</div></div>
+        <div class="input-field"><div class="input-label">Subgrupo</div><div class="input-val editable">A4</div></div>
+        <div class="input-field"><div class="input-label">Modalidade</div><div class="input-val editable">Verde</div></div>
+        <div class="input-field"><div class="input-label">Demanda Contratada</div><div class="input-val editable">250,488</div><div class="input-unit">kW</div></div>
+        <div class="input-field"><div class="input-label">Fator K</div><div class="input-val formula">4,8714</div></div>
+      </div>
+      <div class="section-label">Componentes Tarifários</div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Componente</th><th>Posto</th><th class="ponta">Ponta (R$/kWh)</th><th>Fora Ponta (R$/kWh)</th></tr></thead>
+          <tbody>
+            <tr><td>TUSD Total</td><td>—</td><td class="val ponta">1,3260</td><td class="val fp">0,1180</td></tr>
+            <tr><td>↳ FIO A</td><td>—</td><td class="val ponta">0,25728</td><td class="val fp">0,00000</td></tr>
+            <tr><td>↳ FIO B</td><td>—</td><td class="val ponta">1,13007</td><td class="val fp">0,00000</td></tr>
+            <tr><td>↳ TFSEE</td><td>—</td><td class="val ponta">0,00034</td><td class="val fp">0,00042</td></tr>
+            <tr><td>↳ P&D</td><td>—</td><td class="val ponta">0,00938</td><td class="val fp">0,00042</td></tr>
+            <tr><td>↳ Outros</td><td>—</td><td class="val ponta">0,30520</td><td class="val fp">0,34640</td></tr>
+            <tr><td>TE Total</td><td>—</td><td class="val ponta">0,3790</td><td class="val fp">0,2320</td></tr>
+            <tr style="background:rgba(0,198,207,0.04)"><td><strong>Tarifa Total</strong></td><td>—</td><td class="val ponta" style="font-size:14px"><strong>1,7050</strong></td><td class="val fp" style="font-size:14px"><strong>0,3500</strong></td></tr>
+            <tr><td>Demanda Sem Posto</td><td>—</td><td class="val" colspan="2">R$ 16,54 / kW</td></tr>
+            <tr><td>Demanda Geração</td><td>—</td><td class="val" colspan="2">R$ 9,45 / kW</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">OPEX Grid — Custo Mensal Baseline</div>
+      <div class="card">
+        <table class="tarifa-table" id="opexGridTable"></table>
+      </div>
+    </div>
+
+    <!-- INPUT SOLAR SCDEE -->
+    <div class="panel" id="panel-solar">
+      <div class="panel-header">
+        <div class="panel-title">☀️ Input – Solar SCDEE <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 3 · Plano Profissional</span></div>
+        <div class="panel-desc">Sistema de Compensação de Energia Elétrica (GD). Integra dados de irradiância via SONDA/INPE, PVGIS 5.2 e TMY (ISO 15927-4). Aplica cronograma de transição da Lei 14.300/2022.</div>
+      </div>
+      <div class="aneel-badge">⚡ Fontes: SONDA · PVGIS 5.2 · TMY ISO 15927-4 · PVSyst (manual)</div>
+      <div class="input-grid">
+        <div class="input-field"><div class="input-label">Estado</div><div class="input-val editable">São Paulo</div></div>
+        <div class="input-field"><div class="input-label">Potência CA</div><div class="input-val editable">211,27</div><div class="input-unit">kW</div></div>
+        <div class="input-field"><div class="input-label">Potência CC</div><div class="input-val editable">300</div><div class="input-unit">kWp</div></div>
+        <div class="input-field"><div class="input-label">Sobrecarga Inversor</div><div class="input-val editable">1,42</div></div>
+        <div class="input-field"><div class="input-label">CAPEX</div><div class="input-val editable">R$ 885.000</div></div>
+        <div class="input-field"><div class="input-label">O&M Anual</div><div class="input-val editable">R$ 1.500</div></div>
+        <div class="input-field"><div class="input-label">Degradação Ano 1</div><div class="input-val editable">2,00%</div></div>
+        <div class="input-field"><div class="input-label">Degradação Demais</div><div class="input-val editable">0,55%</div></div>
+        <div class="input-field"><div class="input-label">Modalidade GD</div><div class="input-val editable">GDIII</div></div>
+        <div class="input-field"><div class="input-label">Troca Inversor</div><div class="input-val editable">Ano 12 · R$ 50.000</div></div>
+        <div class="input-field"><div class="input-label">Fonte Solarimetria</div><div class="input-val" style="color:var(--purple)">TMY (ISO 15927-4)</div></div>
+        <div class="input-field"><div class="input-label">Período de Transição</div><div class="input-val formula">15% (2023)</div></div>
+      </div>
+      <div class="section-label">Cronograma de Transição SCDEE — Lei 14.300/2022</div>
+      <div class="card" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2023</div><div style="background:var(--teal);width:30px;height:20px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--teal)">15%</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2024</div><div style="background:var(--teal);width:30px;height:36px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--teal)">30%</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2025</div><div style="background:var(--teal);width:30px;height:52px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--teal)">45%</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2026</div><div style="background:var(--gold);width:30px;height:68px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--gold)">60%</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2027</div><div style="background:var(--gold);width:30px;height:84px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--gold)">75%</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--muted)">2028</div><div style="background:var(--green);width:30px;height:100px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--green)">90%</div></div>
+        <div style="text-align:center;margin-left:8px"><div style="font-size:9px;color:var(--muted)">2029+</div><div style="background:var(--green);width:30px;height:108px;border-radius:3px;margin:3px auto"></div><div style="font-size:9px;color:var(--green)">100%</div></div>
+        <div style="font-size:10px;color:var(--muted);max-width:220px;margin-left:16px;line-height:1.6">Percentual de TUSD FIO B cobrado do prosumidor. Quanto menor, maior o crédito por kWh injetado.</div>
+      </div>
+      <div class="section-label">Potência Gerada (kW AC) — Matriz 12×24</div>
+      <div class="card"><div class="matrix-wrap"><table class="matrix-table" id="solarTable"></table></div></div>
+    </div>
+
+    <!-- BESS PONTA -->
+    <div class="panel" id="panel-bess_ponta">
+      <div class="panel-header">
+        <div class="panel-title">🔋 Input – BESS Ponta <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 4 · Plano Profissional</span></div>
+        <div class="panel-desc">Bateria de íon-lítio para redução de demanda no horário de ponta tarifária. Parâmetros elétricos do sistema e cálculo de viabilidade de descarga.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAPEX BESS</div><div class="kpi-val" style="color:var(--purple)">R$5,526M</div><div class="kpi-sub">Sistema completo</div></div>
+        <div class="kpi-card"><div class="kpi-label">Energia DOD 80%</div><div class="kpi-val" style="color:var(--teal)">1.598</div><div class="kpi-sub">kWh</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pot. Descarga</div><div class="kpi-val" style="color:var(--gold)">228,1</div><div class="kpi-sub">kW</div></div>
+        <div class="kpi-card"><div class="kpi-label">Tempo Descarga</div><div class="kpi-val" style="color:var(--blue)">7,0</div><div class="kpi-sub">horas</div></div>
+        <div class="kpi-card"><div class="kpi-label">Vida Útil</div><div class="kpi-val" style="color:var(--green)">14</div><div class="kpi-sub">anos</div></div>
+        <div class="kpi-card"><div class="kpi-label">EOL Garantido</div><div class="kpi-val" style="color:var(--green)">60%</div><div class="kpi-sub">capacidade remanescente</div></div>
+      </div>
+      <div class="section-label">Parâmetros do Sistema</div>
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">Tensão Nominal</div><div class="spec-val">691,2 <span class="spec-unit">V</span></div></div>
+        <div class="spec-item"><div class="spec-label">Capacidade C10</div><div class="spec-val">2.890 <span class="spec-unit">Ah</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηPCS</div><div class="spec-val">98,2 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηBateria</div><div class="spec-val">98,85 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηTotal (com perdas)</div><div class="spec-val">96,1 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">Ciclos DOD 80%</div><div class="spec-val">4.882,5</div></div>
+        <div class="spec-item"><div class="spec-label">Nº de BMs</div><div class="spec-val">180 <span class="spec-unit">(10 BRs × 18 BMs)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Reposição</div><div class="spec-val">Ano 14 · R$5,526M</div></div>
+        <div class="spec-item"><div class="spec-label">Tensão Corte Carga</div><div class="spec-val">777,6 <span class="spec-unit">V</span></div></div>
+        <div class="spec-item"><div class="spec-label">Tensão Corte Descarga</div><div class="spec-val">583,2 <span class="spec-unit">V</span></div></div>
+        <div class="spec-item"><div class="spec-label">Energia pós-PCS DOD80</div><div class="spec-val">1.535,7 <span class="spec-unit">kWh</span></div></div>
+        <div class="spec-item"><div class="spec-label">Perda do Sistema</div><div class="spec-val">1,15 <span class="spec-unit">%</span></div></div>
+      </div>
+    </div>
+
+    <!-- GEN PONTA -->
+    <div class="panel" id="panel-gen_ponta">
+      <div class="panel-header">
+        <div class="panel-title">🔧 Input – Gerador de Ponta <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 5 · Plano Premium</span></div>
+        <div class="panel-desc">Gerador diesel para abatimento da demanda no horário de ponta tarifária. Usado isoladamente ou em combinação com BESS. Parâmetros do fabricante + cálculo de consumo e custo por kWh gerado.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAPEX Gerador</div><div class="kpi-val" style="color:var(--gold)">R$ 60.000</div><div class="kpi-sub">Investimento inicial</div></div>
+        <div class="kpi-card"><div class="kpi-label">Potência Nominal</div><div class="kpi-val" style="color:var(--teal)">250</div><div class="kpi-sub">kW</div></div>
+        <div class="kpi-card"><div class="kpi-label">Custo Diesel</div><div class="kpi-val" style="color:var(--red)">R$ 5,92</div><div class="kpi-sub">por litro</div></div>
+        <div class="kpi-card"><div class="kpi-label">Vida Útil</div><div class="kpi-val" style="color:var(--green)">5</div><div class="kpi-sub">anos (reposição a cada 5a)</div></div>
+        <div class="kpi-card"><div class="kpi-label">O&M Anual</div><div class="kpi-val" style="color:var(--muted)">R$ 600</div><div class="kpi-sub">manutenção preventiva</div></div>
+        <div class="kpi-card"><div class="kpi-label">Saving Ponta</div><div class="kpi-val" style="color:var(--green)">R$ 25.596</div><div class="kpi-sub">saving anual estimado</div></div>
+      </div>
+      <div class="section-label">Parâmetros do Gerador (Fabricante)</div>
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">Potência nominal</div><div class="spec-val">250 <span class="spec-unit">kW</span></div></div>
+        <div class="spec-item"><div class="spec-label">Reserva girante</div><div class="spec-val">1,0 <span class="spec-unit">(fator)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Set mínimo operação</div><div class="spec-val">250 <span class="spec-unit">kW</span></div></div>
+        <div class="spec-item"><div class="spec-label">Set máximo operação</div><div class="spec-val">250 <span class="spec-unit">kW</span></div></div>
+        <div class="spec-item"><div class="spec-label">Custo diesel / litro</div><div class="spec-val">R$ 5,92 <span class="spec-unit">/l</span></div></div>
+        <div class="spec-item"><div class="spec-label">Penetração renovável</div><div class="spec-val">0% <span class="spec-unit">(ponta pura)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Coef. interceptação</div><div class="spec-val">— <span class="spec-unit">l/h/kW rated</span></div></div>
+        <div class="spec-item"><div class="spec-label">Slope (curva consumo)</div><div class="spec-val">— <span class="spec-unit">l/h/kW rated</span></div></div>
+        <div class="spec-item"><div class="spec-label">CAPEX</div><div class="spec-val">R$ 60.000</div></div>
+        <div class="spec-item"><div class="spec-label">Reposição (a cada 5a)</div><div class="spec-val">R$ 60.000</div></div>
+        <div class="spec-item"><div class="spec-label">O&M anual</div><div class="spec-val">R$ 600</div></div>
+        <div class="spec-item"><div class="spec-label">Vida útil</div><div class="spec-val">5 <span class="spec-unit">anos</span></div></div>
+      </div>
+      <div class="section-label">Fluxo de Caixa — Gen. Ponta (estrutura CF-BD)</div>
+      <div class="card" style="overflow-x:auto">
+        <table class="cf-table">
+          <thead><tr><th class="cat">Item</th><th>Ano 0</th><th>Ano 1</th><th>Ano 2</th><th>Ano 3</th><th>Ano 4</th><th>Ano 5</th><th>...</th><th>Ano 10</th><th>...</th><th>Ano 25</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">CAPITAL</td><td class="neg">-60.000</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>...</td><td>—</td><td>...</td><td>—</td></tr>
+            <tr><td class="cat">REPLACEMENT (reposição a cada 5a)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="neg">-60.000</td><td>...</td><td class="neg">-60.000</td><td>...</td><td class="neg">-60.000</td></tr>
+            <tr><td class="cat">O&M anual</td><td>—</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td><td>...</td><td class="neg">-600</td><td>...</td><td class="neg">-600</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA (saving ponta)</td><td>—</td><td class="pos">+25.596</td><td class="pos">+25.852</td><td class="pos">+26.110</td><td class="pos">+26.372</td><td class="pos">+26.635</td><td>...</td><td class="pos">+28.292</td><td>...</td><td class="pos">+32.814</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">Nota Técnica</div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--muted);line-height:1.8">
+          O gerador de ponta é acionado exclusivamente durante o <strong style="color:var(--text)">horário de ponta tarifária</strong> (tipicamente 18h–21h em dias úteis, conforme modalidade tarifária do cliente). O saving econômico provém da substituição da energia cara de ponta (tarifa R$1,705/kWh) pela energia gerada pelo diesel. A viabilidade depende diretamente do <strong style="color:var(--text)">custo do diesel por kWh gerado</strong> vs. a tarifa ponta — quando o diesel superar R$1,705/kWh, a operação se torna antieconômica. O módulo calcula a curva de consumo a partir dos coeficientes de interceptação e slope fornecidos pelo fabricante (curva de eficiência do grupo gerador).
+        </div>
+      </div>
+    </div>
+
+    <!-- GEN FORMADOR DE REDE -->
+    <div class="panel" id="panel-gen_form">
+      <div class="panel-header">
+        <div class="panel-title">⚙️ Input – Gerador Formador de Rede <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 6 · Plano Premium</span></div>
+        <div class="panel-desc">Gerador diesel em configuração grid-forming (formador de rede) para sistemas híbridos off-grid ou com baixa penetração de rede. Opera em conjunto com Solar e/ou BESS para garantir qualidade de fornecimento.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAPEX Gerador</div><div class="kpi-val" style="color:var(--gold)">R$ 60.000</div><div class="kpi-sub">Investimento inicial</div></div>
+        <div class="kpi-card"><div class="kpi-label">Potência Nominal</div><div class="kpi-val" style="color:var(--teal)">250</div><div class="kpi-sub">kW</div></div>
+        <div class="kpi-card"><div class="kpi-label">Custo Diesel</div><div class="kpi-val" style="color:var(--red)">R$ 5,92</div><div class="kpi-sub">por litro</div></div>
+        <div class="kpi-card"><div class="kpi-label">Vida Útil</div><div class="kpi-val" style="color:var(--green)">5</div><div class="kpi-sub">anos (reposição a cada 5a)</div></div>
+        <div class="kpi-card"><div class="kpi-label">Op. FP Energia</div><div class="kpi-val" style="color:var(--red)">-R$ 64.147</div><div class="kpi-sub">custo anual diesel FP</div></div>
+        <div class="kpi-card"><div class="kpi-label">Op. P Energia</div><div class="kpi-val" style="color:var(--red)">-R$ 268.834</div><div class="kpi-sub">custo anual diesel Ponta</div></div>
+      </div>
+      <div class="section-label">Parâmetros do Sistema Híbrido (Grid-Forming)</div>
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">Potência nominal</div><div class="spec-val">250 <span class="spec-unit">kW</span></div></div>
+        <div class="spec-item"><div class="spec-label">Modo de operação</div><div class="spec-val">Grid-Forming <span class="spec-unit">(formador)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Redução de potência (Solar+Gen)</div><div class="spec-val">—</div></div>
+        <div class="spec-item"><div class="spec-label">Penetração renovável</div><div class="spec-val">— <span class="spec-unit">% (definir no projeto)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Custo diesel / litro</div><div class="spec-val">R$ 5,92 <span class="spec-unit">/l</span></div></div>
+        <div class="spec-item"><div class="spec-label">CAPEX</div><div class="spec-val">R$ 60.000</div></div>
+        <div class="spec-item"><div class="spec-label">Reposição (a cada 5a)</div><div class="spec-val">R$ 60.000</div></div>
+        <div class="spec-item"><div class="spec-label">O&M anual</div><div class="spec-val">R$ 600</div></div>
+        <div class="spec-item"><div class="spec-label">Vida útil</div><div class="spec-val">5 <span class="spec-unit">anos</span></div></div>
+        <div class="spec-item"><div class="spec-label">Reposições em 25a</div><div class="spec-val">Anos 5, 10, 15, 20, 25</div></div>
+      </div>
+      <div class="section-label">Fluxo de Caixa — Gen. Formador (estrutura CF-BD)</div>
+      <div class="card" style="overflow-x:auto">
+        <table class="cf-table">
+          <thead><tr><th class="cat">Item</th><th>Ano 0</th><th>Ano 1</th><th>Ano 2</th><th>...</th><th>Ano 5</th><th>Ano 10</th><th>Ano 15</th><th>Ano 20</th><th>Ano 25</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">CAPITAL</td><td class="neg">-60.000</td><td>—</td><td>—</td><td>...</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">REPLACEMENT (a cada 5a)</td><td>—</td><td>—</td><td>—</td><td>...</td><td class="neg">-60.000</td><td class="neg">-60.000</td><td class="neg">-60.000</td><td class="neg">-60.000</td><td class="neg">-60.000</td></tr>
+            <tr><td class="cat">O&M anual</td><td>—</td><td class="neg">-600</td><td class="neg">-600</td><td>...</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td><td class="neg">-600</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA (diesel FP)</td><td>—</td><td class="neg">-64.147</td><td class="neg">-64.147</td><td>...</td><td class="neg">-64.147</td><td class="neg">-64.147</td><td class="neg">-64.147</td><td class="neg">-64.147</td><td class="neg">-64.147</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA (diesel Ponta)</td><td>—</td><td class="neg">-268.834</td><td class="neg">-271.523</td><td>...</td><td class="neg">-282.089</td><td class="neg">-295.056</td><td class="neg">-308.690</td><td class="neg">-323.039</td><td class="neg">-338.152</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">Nota Técnica — Grid-Forming</div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--muted);line-height:1.8">
+          Em modo <strong style="color:var(--text)">grid-forming</strong>, o gerador atua como referência de tensão e frequência para o microgrid, permitindo operação isolada da rede pública. O gerador opera em paralelo com o sistema solar e/ou BESS. O custo de operação é significativamente maior do que no modo ponta (opera 24h/dia vs. apenas no horário de ponta). A <strong style="color:var(--text)">penetração renovável</strong> indica o percentual de substituição do diesel pela energia solar — quanto maior, menor o OPEX com combustível. Este módulo é pré-requisito para os cálculos de viabilidade de sistemas <strong style="color:var(--text)">híbridos off-grid</strong>.
+        </div>
+      </div>
+    </div>
+
+    <!-- BESS FORMADOR DE REDE -->
+    <div class="panel" id="panel-bess_form">
+      <div class="panel-header">
+        <div class="panel-title">🔋 Input – BESS Formador de Rede <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 7 · Plano Premium</span></div>
+        <div class="panel-desc">Bateria em configuração grid-forming para sistemas híbridos. Opera em conjunto com o gerador e/ou solar para eliminar ou reduzir dependência da rede pública. CAPEX superior ao BESS de ponta por exigir inversores grid-forming dedicados.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAPEX BESS Forming</div><div class="kpi-val" style="color:var(--purple)">R$ 5,560M</div><div class="kpi-sub">Sistema completo grid-forming</div></div>
+        <div class="kpi-card"><div class="kpi-label">Reposição (Ano 14)</div><div class="kpi-val" style="color:var(--red)">R$ 5,560M</div><div class="kpi-sub">substituição dos módulos</div></div>
+        <div class="kpi-card"><div class="kpi-label">ηTotal</div><div class="kpi-val" style="color:var(--teal)">96,1%</div><div class="kpi-sub">PCS + Bateria + Sistema</div></div>
+        <div class="kpi-card"><div class="kpi-label">Vida Útil</div><div class="kpi-val" style="color:var(--green)">14</div><div class="kpi-sub">anos</div></div>
+        <div class="kpi-card"><div class="kpi-label">O&M Anual</div><div class="kpi-val" style="color:var(--muted)">—</div><div class="kpi-sub">incluso no contrato</div></div>
+        <div class="kpi-card"><div class="kpi-label">Diferença vs BESS Ponta</div><div class="kpi-val" style="color:var(--gold)">+R$ 34k</div><div class="kpi-sub">custo adicional grid-forming</div></div>
+      </div>
+      <div class="section-label">Especificações do Sistema BESS Grid-Forming</div>
+      <div class="spec-grid">
+        <div class="spec-item"><div class="spec-label">CAPEX total</div><div class="spec-val">R$ 5.560.000</div></div>
+        <div class="spec-item"><div class="spec-label">Custo de reposição (Ano 14)</div><div class="spec-val">R$ 5.560.000</div></div>
+        <div class="spec-item"><div class="spec-label">Modo de operação</div><div class="spec-val">Grid-Forming <span class="spec-unit">(formador)</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηPCS</div><div class="spec-val">98,2 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηBateria</div><div class="spec-val">98,85 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">ηTotal</div><div class="spec-val">96,1 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">Perda do sistema</div><div class="spec-val">1,15 <span class="spec-unit">%</span></div></div>
+        <div class="spec-item"><div class="spec-label">Vida útil</div><div class="spec-val">14 <span class="spec-unit">anos</span></div></div>
+        <div class="spec-item"><div class="spec-label">Diferencial vs BESS Ponta</div><div class="spec-val">+R$ 34.000 <span class="spec-unit">(inversor grid-forming)</span></div></div>
+        <div class="spec-item"><div class="spec-label">Compatível com solar</div><div class="spec-val">Sim — PV BESS Forming</div></div>
+      </div>
+      <div class="section-label">Fluxo de Caixa — BESS Formador (estrutura CF-BD)</div>
+      <div class="card" style="overflow-x:auto">
+        <table class="cf-table">
+          <thead><tr><th class="cat">Item</th><th>Ano 0</th><th>Ano 1–13</th><th>Ano 14</th><th>Ano 15–25</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">CAPITAL</td><td class="neg">-5.560.000</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">REPLACEMENT (Ano 14)</td><td>—</td><td>—</td><td class="neg">-5.560.000</td><td>—</td></tr>
+            <tr><td class="cat">O&M</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr style="background:rgba(255,255,255,0.03)"><td class="cat" style="color:var(--muted);font-style:italic" colspan="5">⚠ Savings dependem da combinação com Solar (PV BESS Forming) e/ou Gerador Formador — calcular no módulo de combinação.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">Solar Híbrido BESS (PV BESS Forming)</div>
+      <div class="card">
+        <div class="input-grid">
+          <div class="input-field"><div class="input-label">Potência CC Solar</div><div class="input-val editable">—</div><div class="input-unit">kWp (a definir)</div></div>
+          <div class="input-field"><div class="input-label">CAPEX Solar Híbrido</div><div class="input-val editable">R$ 1.484.058</div><div class="input-unit">da planilha CF-BD</div></div>
+          <div class="input-field"><div class="input-label">O&M Solar Híbrido</div><div class="input-val editable">R$ 1.500</div><div class="input-unit">anual</div></div>
+          <div class="input-field"><div class="input-label">Troca Inversor</div><div class="input-val editable">Ano 12 e 24 · R$ 50.000</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW GRID -->
+    <div class="panel" id="panel-new_grid">
+      <div class="panel-header">
+        <div class="panel-title">🌐 Input – New Grid <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 8 · Plano Premium</span></div>
+        <div class="panel-desc">Custo de implantação de uma nova rede elétrica como alternativa ao sistema híbrido. Utiliza as mesmas tarifas do Grid existente para cálculo de OPEX. Permite comparação econômica direta entre nova rede vs. solução híbrida.</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAPEX Nova Rede</div><div class="kpi-val" style="color:var(--red)">R$ 15,0M</div><div class="kpi-sub">implantação completa</div></div>
+        <div class="kpi-card"><div class="kpi-label">OPEX Grid Anual</div><div class="kpi-val" style="color:var(--gold)">R$ 212.432</div><div class="kpi-sub">igual ao baseline Grid</div></div>
+        <div class="kpi-card"><div class="kpi-label">O&M</div><div class="kpi-val" style="color:var(--muted)">—</div><div class="kpi-sub">incluso na tarifa</div></div>
+        <div class="kpi-card"><div class="kpi-label">Concessionária</div><div class="kpi-val" style="color:var(--white);font-size:14px">Cemig-D</div><div class="kpi-sub">mesmas tarifas do Grid</div></div>
+        <div class="kpi-card"><div class="kpi-label">Demanda Contratada</div><div class="kpi-val" style="color:var(--teal)">250,49</div><div class="kpi-sub">kW</div></div>
+        <div class="kpi-card"><div class="kpi-label">CAPEX vs Híbrido</div><div class="kpi-val" style="color:var(--red)">+R$ 8,6M</div><div class="kpi-sub">vs Solar+BESS (R$6,4M)</div></div>
+      </div>
+      <div class="section-label">Parâmetros da Nova Rede</div>
+      <div class="input-grid">
+        <div class="input-field"><div class="input-label">CAPEX Nova Rede</div><div class="input-val editable">R$ 15.000.000</div></div>
+        <div class="input-field"><div class="input-label">Concessionária</div><div class="input-val editable">Cemig-D</div></div>
+        <div class="input-field"><div class="input-label">Subgrupo</div><div class="input-val editable">A4</div></div>
+        <div class="input-field"><div class="input-label">Modalidade</div><div class="input-val editable">Verde</div></div>
+        <div class="input-field"><div class="input-label">Demanda Contratada</div><div class="input-val editable">250,488</div><div class="input-unit">kW</div></div>
+        <div class="input-field"><div class="input-label">Demanda Geração</div><div class="input-val editable">0</div><div class="input-unit">kW</div></div>
+      </div>
+      <div class="section-label">Tarifas Aplicadas (idênticas ao Grid Baseline)</div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Componente</th><th class="ponta">Ponta (R$/kWh)</th><th>Fora Ponta (R$/kWh)</th></tr></thead>
+          <tbody>
+            <tr><td>TUSD Total</td><td class="val ponta">1,3260</td><td class="val fp">0,1180</td></tr>
+            <tr><td>TE Total</td><td class="val ponta">0,3790</td><td class="val fp">0,2320</td></tr>
+            <tr style="background:rgba(0,198,207,0.04)"><td><strong>Tarifa Total</strong></td><td class="val ponta"><strong>1,7050</strong></td><td class="val fp"><strong>0,3500</strong></td></tr>
+            <tr><td>Demanda Sem Posto</td><td class="val" colspan="2">R$ 16,54 / kW</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">Fluxo de Caixa — New Grid (estrutura CF-BD)</div>
+      <div class="card" style="overflow-x:auto">
+        <table class="cf-table">
+          <thead><tr><th class="cat">Item</th><th>Ano 0</th><th>Ano 1</th><th>Ano 2</th><th>...</th><th>Ano 10</th><th>Ano 25</th></tr></thead>
+          <tbody>
+            <tr><td class="cat">CAPITAL (obra civil + conexão)</td><td class="neg">-15.000.000</td><td>—</td><td>—</td><td>...</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">REPLACEMENT</td><td>—</td><td>—</td><td>—</td><td>...</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">O&M</td><td>—</td><td>—</td><td>—</td><td>...</td><td>—</td><td>—</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA</td><td>—</td><td class="neg">-75.248</td><td class="neg">-75.248</td><td>...</td><td class="neg">-75.248</td><td class="neg">-75.248</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA</td><td>—</td><td class="neg">-87.467</td><td class="neg">-88.341</td><td>...</td><td class="neg">-96.618</td><td class="neg">-112.170</td></tr>
+            <tr><td class="cat">OPERATING FP – DEMANDA</td><td>—</td><td class="neg">-49.717</td><td class="neg">-50.115</td><td>...</td><td class="neg">-53.840</td><td class="neg">-60.676</td></tr>
+            <tr style="background:rgba(231,76,60,0.06)"><td class="cat" style="color:var(--red);font-weight:700">TOTAL ANO</td><td class="neg">-15.000.000</td><td class="neg">-212.432</td><td class="neg">-213.704</td><td>...</td><td class="neg">-225.706</td><td class="neg">-248.094</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="section-label">Comparativo New Grid vs Solar+BESS (Resumo)</div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Indicador</th><th>New Grid</th><th>Solar + BESS Ponta</th><th>Diferença</th></tr></thead>
+          <tbody>
+            <tr><td>CAPEX inicial</td><td class="val neg">R$ 15.000.000</td><td class="val neg">R$ 6.411.000</td><td class="val pos">New Grid custa R$ 8,6M a mais</td></tr>
+            <tr><td>OPEX anual (Ano 1)</td><td class="val neg">-R$ 212.432</td><td class="val neg">-R$ 142.920</td><td class="val pos">Solar+BESS economiza R$ 69.512/ano</td></tr>
+            <tr><td>VPL 25 anos</td><td class="val neg">Muito negativo</td><td class="val neg">-R$ 51,5M</td><td class="val">New Grid = maior investimento inicial</td></tr>
+            <tr><td>Viabilidade</td><td class="val neg">Inviável (alto CAPEX)</td><td class="val neg">Inviável (BESS caro)</td><td class="val" style="color:var(--muted)">Ambos inviáveis nesta configuração</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FLUXO DE CAIXA -->
+    <div class="panel" id="panel-cf">
+      <div class="panel-header">
+        <div class="panel-title">📈 Fluxo de Caixa (25 anos) <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo 9 · Plano Básico</span></div>
+        <div class="panel-desc">Fluxo de caixa nominal e descontado de cada módulo. Cálculo de TIR, VPL, Payback e ROI. Taxa de desconto real e inflação configuráveis.</div>
+      </div>
+      <div class="input-grid">
+        <div class="input-field"><div class="input-label">Taxa Desconto (nominal)</div><div class="input-val editable">8,00%</div></div>
+        <div class="input-field"><div class="input-label">Inflação (IPCA acum. 12m)</div><div class="input-val editable">3,93%</div></div>
+        <div class="input-field"><div class="input-label">Taxa Real</div><div class="input-val formula">3,916%</div></div>
+        <div class="input-field"><div class="input-label">Horizonte</div><div class="input-val editable">25 anos</div></div>
+        <div class="input-field"><div class="input-label">Reaj. Tarifa Ponta</div><div class="input-val editable">1,00% a.a.</div></div>
+        <div class="input-field"><div class="input-label">Reaj. Demanda S.P.</div><div class="input-val editable">0,80% a.a.</div></div>
+      </div>
+      <div class="section-label">Estrutura de Custos por Item (CF-BD)</div>
+      <div class="card" style="overflow-x:auto">
+        <table class="cf-table">
+          <thead>
+            <tr>
+              <th class="cat">Item</th>
+              <th>Ano 0</th><th>Ano 1</th><th>Ano 2</th><th>...</th>
+              <th>Ano 14</th><th>Ano 15</th><th>...</th><th>Ano 25</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="section-row"><td class="cat" colspan="9">BASE LINE — GRID</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA</td><td class="neg">-75.248</td><td class="neg">-75.248</td><td class="neg">-75.248</td><td class="neg">...</td><td class="neg">-75.248</td><td class="neg">-75.248</td><td class="neg">...</td><td class="neg">-75.248</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA</td><td class="neg">-87.467</td><td class="neg">-88.341</td><td class="neg">-89.225</td><td class="neg">...</td><td class="neg">-100.541</td><td class="neg">-101.546</td><td class="neg">...</td><td class="neg">-112.170</td></tr>
+            <tr><td class="cat">OPERATING FP – DEMANDA</td><td class="neg">-49.717</td><td class="neg">-50.115</td><td class="neg">-50.516</td><td class="neg">...</td><td class="neg">-55.584</td><td class="neg">-56.029</td><td class="neg">...</td><td class="neg">-60.676</td></tr>
+            <tr class="section-row"><td class="cat" colspan="9">PV – SCDEE</td></tr>
+            <tr><td class="cat">CAPITAL</td><td class="neg">-885.000</td><td>—</td><td>—</td><td>...</td><td>—</td><td>—</td><td>...</td><td>—</td></tr>
+            <tr><td class="cat">REPLACEMENT (inversor)</td><td>—</td><td>—</td><td>—</td><td>...</td><td class="neg">-50.000</td><td>—</td><td>...</td><td>—</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA</td><td class="pos">+161.423</td><td class="pos">+161.423</td><td class="pos">+161.423</td><td class="pos">...</td><td class="pos">+161.423</td><td class="pos">+161.423</td><td class="pos">...</td><td class="pos">+161.423</td></tr>
+            <tr class="section-row"><td class="cat" colspan="9">BESS – PONTA</td></tr>
+            <tr><td class="cat">CAPITAL</td><td class="neg">-5.526.000</td><td>—</td><td>—</td><td>...</td><td class="neg">-5.526.000</td><td>—</td><td>...</td><td>—</td></tr>
+            <tr><td class="cat">OPERATING FP – ENERGIA (carga)</td><td class="neg">-17.955</td><td class="neg">-17.955</td><td class="neg">-17.955</td><td class="neg">...</td><td class="neg">-17.955</td><td class="neg">-17.955</td><td class="neg">...</td><td class="neg">-17.955</td></tr>
+            <tr><td class="cat">OPERATING P – ENERGIA (saving)</td><td class="pos">+87.467</td><td class="pos">+88.341</td><td class="pos">+89.225</td><td class="pos">...</td><td class="pos">+100.541</td><td class="pos">+101.546</td><td class="pos">...</td><td class="pos">+112.170</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- COMPARAÇÃO ECONÔMICA -->
+    <div class="panel" id="panel-comparacao">
+      <div class="panel-header">
+        <div class="panel-title">🏆 Comparação Econômica</div>
+        <div class="panel-desc">Indicadores econômico-financeiros do projeto. TIR, VPL, Payback e ROI — nominal e descontado.</div>
+      </div>
+      <div class="ind-grid">
+        <div class="ind-card inviavel"><div class="ind-title">TIR</div><div class="ind-value">INVIÁVEL</div><div class="ind-sub">BESS ponta isolado</div></div>
+        <div class="ind-card inviavel"><div class="ind-title">VPL (25 anos)</div><div class="ind-value">-R$51,5M</div><div class="ind-sub">Nominal</div></div>
+        <div class="ind-card inviavel"><div class="ind-title">VPL Descontado</div><div class="ind-value">-R$49,2M</div><div class="ind-sub">Taxa 8% a.a.</div></div>
+        <div class="ind-card gold"><div class="ind-title">CAPEX Total</div><div class="ind-value">R$6,4M</div><div class="ind-sub">Solar + BESS</div></div>
+        <div class="ind-card inviavel"><div class="ind-title">ROI</div><div class="ind-value">-128%</div><div class="ind-sub">VPL / Investimento</div></div>
+        <div class="ind-card neutro"><div class="ind-title">Payback</div><div class="ind-value">N/A</div><div class="ind-sub">Não atingido em 25a</div></div>
+      </div>
+      <div class="section-label">Premissas Econômicas</div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Parâmetro</th><th>Valor</th><th>Observação</th></tr></thead>
+          <tbody>
+            <tr><td>TMA (Taxa Mínima de Atratividade)</td><td class="val">12,00% a.a.</td><td>Nominal</td></tr>
+            <tr><td>Taxa de Desconto</td><td class="val">8,00% a.a.</td><td>Nominal</td></tr>
+            <tr><td>Inflação (IPCA 12m)</td><td class="val">3,93% a.a.</td><td>Acumulado últimos 12 meses</td></tr>
+            <tr><td>Taxa Desconto Real</td><td class="val">3,916% a.a.</td><td>= (1+8%)/(1+3,93%) - 1</td></tr>
+            <tr><td>Horizonte do Projeto</td><td class="val">25 anos</td><td>—</td></tr>
+            <tr><td>Reajuste Tarifa Ponta</td><td class="val">1,00% a.a.</td><td>—</td></tr>
+            <tr><td>Reajuste Tarifa FP</td><td class="val">0,00% a.a.</td><td>—</td></tr>
+            <tr><td>Reajuste Demanda S.P.</td><td class="val">0,80% a.a.</td><td>—</td></tr>
+            <tr><td>Reajuste Combustível</td><td class="val">1,00% a.a.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- COST SUMMARY -->
+    <div class="panel" id="panel-costsum">
+      <div class="panel-header">
+        <div class="panel-title">💰 Cost Summary</div>
+      </div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Item</th><th>Grupo</th><th>CAPEX</th><th>O&M</th><th>Op. FP Energia</th><th>Op. P Energia</th><th>Op. FP Demanda</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><td>BASE LINE</td><td>GRID</td><td class="val">—</td><td class="val">—</td><td class="val neg">-75.248</td><td class="val neg">-91.018</td><td class="val neg">-51.738</td><td class="val neg">-218.004</td></tr>
+            <tr><td>CASE 1</td><td>BESS – Ponta</td><td class="val neg">-5.526.000</td><td class="val">—</td><td class="val neg">-17.955</td><td class="val">—</td><td class="val">—</td><td class="val neg">-5.543.955</td></tr>
+            <tr><td>CASE 2</td><td>N/A</td><td class="val">—</td><td class="val">—</td><td class="val">—</td><td class="val">—</td><td class="val">—</td><td class="val">—</td></tr>
+            <tr style="background:rgba(0,198,207,0.05)"><td><strong>TOTAL</strong></td><td></td><td class="val neg"><strong>-5.526.000</strong></td><td class="val">—</td><td class="val neg"><strong>-93.203</strong></td><td class="val neg"><strong>-91.018</strong></td><td class="val neg"><strong>-51.738</strong></td><td class="val neg"><strong>-5.761.959</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GRID ZERO -->
+    <div class="panel" id="panel-gridzero">
+      <div class="panel-header">
+        <div class="panel-title">⚡ Input – Grid Zero <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px">Módulo GZ · Plano Profissional</span></div>
+        <div class="panel-desc">
+          Sistema fotovoltaico <strong style="color:var(--white)">sem injeção de energia na rede</strong> — toda a geração deve ser consumida instantaneamente pela carga local.
+          O dimensionamento ótimo depende da <strong style="color:var(--gold)">taxa de autoconsumo</strong> e da <strong style="color:var(--teal)">simultaneidade</strong> entre curvas de carga e geração.
+          Metodologia: Artigo <em>"Dimensionamento ótimo de sistemas GridZero"</em> — Revista Canal Solar N°33, Dez/2025 (Thiago Farias, Especialista de Projetos).
+        </div>
+      </div>
+
+      <!-- KPIs rápidos -->
+      <div class="kpi-row" id="gz-kpis">
+        <div class="kpi-card"><div class="kpi-label">Potência Inversor</div><div class="kpi-val" id="gz-kw" style="color:var(--teal)">75</div><div class="kpi-sub">kW AC</div></div>
+        <div class="kpi-card"><div class="kpi-label">Potência CC (132%)</div><div class="kpi-val" id="gz-kwp" style="color:var(--gold)">99</div><div class="kpi-sub">kWp</div></div>
+        <div class="kpi-card"><div class="kpi-label">Autoconsumo</div><div class="kpi-val" id="gz-ac" style="color:var(--green)">—</div><div class="kpi-sub">%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Simultaneidade</div><div class="kpi-val" id="gz-sim" style="color:var(--purple)">—</div><div class="kpi-sub">%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Payback Descontado</div><div class="kpi-val" id="gz-pb" style="color:var(--teal)">—</div><div class="kpi-sub">anos</div></div>
+        <div class="kpi-card"><div class="kpi-label">VPL (TMA 12%)</div><div class="kpi-val" id="gz-vpl" style="color:var(--green)">—</div><div class="kpi-sub">R$</div></div>
+      </div>
+
+      <!-- Parâmetros de entrada -->
+      <div class="section-label">Parâmetros de Entrada</div>
+      <div class="input-grid">
+        <div class="input-field">
+          <div class="input-label">Concessionária / Tarifa</div>
+          <select class="ctrl" id="gz-concessionaria" onchange="gzRecalcular()">
+            <option value="cpfl_b3">CPFL Paulista — Classe B3</option>
+            <option value="cemig_a4">Cemig-D — A4 Verde</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+        <div class="input-field">
+          <div class="input-label">TE (R$/kWh)</div>
+          <input type="number" id="gz-te" class="input-val editable" value="0.287" step="0.001" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">TUSD (R$/kWh)</div>
+          <input type="number" id="gz-tusd" class="input-val editable" value="0.388" step="0.001" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">ICMS (%)</div>
+          <input type="number" id="gz-icms" class="input-val editable" value="18" step="0.1" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">PIS+COFINS (%)</div>
+          <input type="number" id="gz-piscofins" class="input-val editable" value="5" step="0.1" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">Reajuste Anual Tarifa (%)</div>
+          <input type="number" id="gz-reaj" class="input-val editable" value="5" step="0.5" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">CAPEX (R$/kWp)</div>
+          <input type="number" id="gz-capex" class="input-val editable" value="3000" step="100" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">O&M (% CAPEX/ano)</div>
+          <input type="number" id="gz-om" class="input-val editable" value="1" step="0.1" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">IPCA (% a.a.)</div>
+          <input type="number" id="gz-ipca" class="input-val editable" value="4.5" step="0.1" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+        <div class="input-field">
+          <div class="input-label">TMA (% a.a.)</div>
+          <input type="number" id="gz-tma" class="input-val editable" value="12" step="0.5" oninput="gzRecalcular()" style="border:1px solid var(--border);background:var(--panel);color:var(--teal);font-family:var(--mono);padding:7px 10px;border-radius:5px;width:100%">
+        </div>
+      </div>
+
+      <!-- Seletor de potência do inversor -->
+      <div class="section-label">Tamanho do Sistema — Comparativo de Potências (ISO: sobredimensionamento 32%)</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn primary" id="btn-25kw" onclick="gzSelecionarPotencia(25,this)">25 kW AC · 33 kWp</button>
+        <button class="btn primary" id="btn-50kw" onclick="gzSelecionarPotencia(50,this)">50 kW AC · 66 kWp</button>
+        <button class="btn" id="btn-75kw" onclick="gzSelecionarPotencia(75,this)">75 kW AC · 99 kWp</button>
+        <button class="btn" id="btn-100kw" onclick="gzSelecionarPotencia(100,this)">100 kW AC · 132 kWp</button>
+        <button class="btn" id="btn-150kw" onclick="gzSelecionarPotencia(150,this)">150 kW AC · 198 kWp</button>
+      </div>
+
+      <!-- Gráfico de curvas -->
+      <div class="section-label">Curvas de Carga e Geração (Média Diária Anual)</div>
+      <div class="chart-area" style="padding:0;height:280px;position:relative;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <canvas id="gzChart"></canvas>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;margin-top:8px;padding:0 4px">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:20px;height:3px;background:#4fa3e0;display:inline-block;border-radius:2px"></span>Carga (kW)</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:20px;height:3px;background:#f5a623;display:inline-block;border-radius:2px"></span>Geração FV (kW)</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:20px;height:3px;background:rgba(231,76,60,0.7);display:inline-block;border-radius:2px;border:1px dashed #e74c3c"></span>Excedente (cortado no GZ)</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:20px;height:8px;background:rgba(0,198,207,0.15);display:inline-block;border-radius:2px;border:1px solid rgba(0,198,207,0.4)"></span>Área autoconsumo</span>
+      </div>
+
+      <!-- Tabela de resultados comparativa (idêntica ao artigo Canal Solar N°33) -->
+      <div class="section-label">Resultados — Fiel ao Artigo Canal Solar N°33 (Tabelas 3, 4 e 5)</div>
+      <div class="card" style="overflow-x:auto">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+          ⚡ <strong style="color:var(--white)">Curva Tipo Real</strong> — dados da planilha <em>Estudo_Grid-Zero_2.xlsx</em> (consumo médio ~1.400 kWh/dia · demanda base ~60–90 kW · pico ~88 kW)
+          · Sobredimensionamento CC/CA = 1,32 · TMA = 12% a.a. · IPCA = 4,5% a.a.
+        </div>
+        <table class="tarifa-table" id="gz-tabela-resultados">
+          <thead>
+            <tr>
+              <th>SISTEMA</th>
+              <th style="color:var(--teal)">25 kW AC<br><small style="color:var(--muted)">33 kWp</small></th>
+              <th style="color:var(--teal)">50 kW AC<br><small style="color:var(--muted)">66 kWp</small></th>
+              <th style="color:var(--teal)">75 kW AC<br><small style="color:var(--muted)">99 kWp</small></th>
+              <th style="color:var(--teal)">100 kW AC<br><small style="color:var(--muted)">132 kWp</small></th>
+              <th style="color:var(--teal)">150 kW AC<br><small style="color:var(--muted)">198 kWp</small></th>
+            </tr>
+          </thead>
+          <tbody id="gz-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Rendimento por kWp (Tabela 6 do artigo) -->
+      <div class="section-label">Rendimento Financeiro por kWp Instalado (R$/kWp) — ref. Tabela 6 do Artigo</div>
+      <div class="card">
+        <table class="tarifa-table" id="gz-tabela-kwp">
+          <thead><tr><th>Curva</th><th>33 kWp (25kW)</th><th>66 kWp (50kW)</th><th>99 kWp (75kW)</th><th>132 kWp (100kW)</th><th>198 kWp (150kW)</th></tr></thead>
+          <tbody id="gz-kwp-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Nota técnica -->
+      <div class="section-label">Fundamentos Técnicos — GridZero</div>
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;line-height:1.7;color:var(--muted)">
+          <div>
+            <div style="color:var(--teal);font-weight:700;margin-bottom:6px">O que é GridZero?</div>
+            A <strong style="color:var(--text)">inversão de fluxo</strong> ocorre quando a geração solar excede o consumo instantâneo. O sistema GridZero impede essa exportação — toda energia gerada é consumida localmente. Usado quando a distribuidora restringe a injeção ou quando os custos de adequação da rede inviabilizam o projeto convencional.
+          </div>
+          <div>
+            <div style="color:var(--gold);font-weight:700;margin-bottom:6px">Autoconsumo vs. Simultaneidade</div>
+            <strong style="color:var(--text)">Autoconsumo</strong>: % do consumo total atendido pelo FV.<br>
+            <strong style="color:var(--text)">Simultaneidade</strong>: % da geração FV efetivamente aproveitada.<br>
+            No GridZero, <em>toda geração > carga é cortada</em> (clipping). O dimensionamento ótimo maximiza ambos os índices para a curva de carga do cliente.
+          </div>
+          <div>
+            <div style="color:var(--purple);font-weight:700;margin-bottom:6px">Impacto da Curva de Carga</div>
+            Curvas com consumo concentrado no período solar (comercial típico) favorecem sistemas maiores com boa simultaneidade. Curvas com consumo noturno elevado (indústria 24h) limitam o retorno de sistemas grandes, pois o excedente diurno é desperdiçado.
+          </div>
+          <div>
+            <div style="color:var(--green);font-weight:700;margin-bottom:6px">Critério de Dimensionamento Ótimo</div>
+            O artigo (Canal Solar N°33) conclui: <em>"a otimização está associada à maximização do autoconsumo e do fator de simultaneidade"</em>. O índice <strong style="color:var(--text)">VPL/kWp</strong> revela que sistemas maiores podem ter VPL total maior, mas retorno por kWp inferior. A decisão ótima equilibra esses indicadores com o perfil de consumo.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LICENÇAS -->
+    <div class="panel" id="panel-licencas">
+      <div class="panel-header">
+        <div class="panel-title">🔑 Gerenciamento de Licenças</div>
+        <div class="panel-desc">Cada módulo é licenciado individualmente. Adquira somente os módulos que seu projeto necessita.</div>
+      </div>
+      <div class="lic-grid">
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--green)"></div><div class="lic-label">Input – Load</div></div><span class="lic-plan" style="background:rgba(46,204,113,0.12);color:var(--green)">Básico ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--blue)"></div><div class="lic-label">Input – Grid + API ANEEL</div></div><span class="lic-plan" style="background:rgba(46,204,113,0.12);color:var(--green)">Básico ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--gold)"></div><div class="lic-label">Solar SCDEE + Solarimetria</div></div><span class="lic-plan" style="background:rgba(245,166,35,0.12);color:var(--gold)">Pro ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--purple)"></div><div class="lic-label">BESS – Ponta</div></div><span class="lic-plan" style="background:rgba(245,166,35,0.12);color:var(--gold)">Pro ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:#e17055"></div><div class="lic-label">Gerador – Ponta</div></div><span class="lic-plan" style="background:rgba(162,155,254,0.12);color:var(--purple)">Premium ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:#fd79a8"></div><div class="lic-label">Gerador – Formador de Rede</div></div><span class="lic-plan" style="background:rgba(162,155,254,0.12);color:var(--purple)">Premium ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:#6c5ce7"></div><div class="lic-label">BESS – Formador de Rede</div></div><span class="lic-plan" style="background:rgba(162,155,254,0.12);color:var(--purple)">Premium ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:#00b894"></div><div class="lic-label">New Grid</div></div><span class="lic-plan" style="background:rgba(162,155,254,0.12);color:var(--purple)">Premium ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--green)"></div><div class="lic-label">Fluxo de Caixa + Indicadores</div></div><span class="lic-plan" style="background:rgba(46,204,113,0.12);color:var(--green)">Básico ✓</span></div>
+        <div class="lic-item"><div class="lic-left"><div class="lic-dot" style="background:var(--green)"></div><div class="lic-label">Cost Summary + Comparação</div></div><span class="lic-plan" style="background:rgba(46,204,113,0.12);color:var(--green)">Básico ✓</span></div>
+      </div>
+      <div class="section-label">Comparativo de Planos</div>
+      <div class="card">
+        <table class="tarifa-table">
+          <thead><tr><th>Recurso</th><th style="color:var(--green)">Básico</th><th style="color:var(--gold)">Profissional</th><th style="color:var(--purple)">Premium</th></tr></thead>
+          <tbody>
+            <tr><td>Input Load + Grid</td><td class="val pos">✓</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>API ANEEL (tarifas automáticas)</td><td class="val pos">✓</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>Fluxo de Caixa + VPL/TIR</td><td class="val pos">✓</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>Solar SCDEE (GDII/GDIII)</td><td class="val neg">✗</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>BESS – Redução de Ponta</td><td class="val neg">✗</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>Integração SONDA + PVGIS + TMY</td><td class="val neg">✗</td><td class="val pos">✓</td><td class="val pos">✓</td></tr>
+            <tr><td>Gerador Diesel (Ponta / Formador)</td><td class="val neg">✗</td><td class="val neg">✗</td><td class="val pos">✓</td></tr>
+            <tr><td>BESS Formador de Rede</td><td class="val neg">✗</td><td class="val neg">✗</td><td class="val pos">✓</td></tr>
+            <tr><td>New Grid (nova rede elétrica)</td><td class="val neg">✗</td><td class="val neg">✗</td><td class="val pos">✓</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ── Dados da planilha ──────────────────────────────────────────────────────
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const HORAS = Array.from({length:24},(_,i)=>i);
+
+const demanda = [
+  [16.8,17.64,15.96,16.8,17.64,15.96,15.12,21,42.84,51.24,55.44,56.28,63,121.8,151.2,151.2,158.76,146.16,123.48,121.8,125.16,33.6,20.16,21],
+  [36.96,17.64,17.64,16.8,19.32,16.8,21.84,63.84,88.2,95.76,101.64,104.16,140.28,196.56,215.04,215.88,186.48,211.68,111.72,88.2,89.04,77.28,57.96,40.32],
+  [19.32,18.48,20.16,20.16,18.48,17.64,40.32,77.28,100.8,105,112.56,117.6,151.2,204.12,215.04,225.96,214.2,198.24,133.56,99.12,98.28,92.4,76.44,27.72],
+  [15.12,14.28,14.28,13.44,13.44,15.12,21,28.56,36.12,72.24,67.2,66.36,94.92,163.8,168,152.88,151.2,145.32,73.92,84,76.44,63.84,57.12,34.44],
+  [16.8,15.96,14.28,15.96,14.28,15.12,18.48,28.56,42,46.2,51.24,52.08,63.84,124.32,152.88,143.64,129.36,118.44,78.96,84,81.48,61.32,43.68,21],
+  [17.64,15.96,18.48,16.8,17.64,15.96,21,25.2,27.72,29.4,32.76,38.64,48.72,99.96,99.96,93.24,79.8,72.24,36.96,40.32,41.16,36.96,33.6,25.2],
+  [13.44,13.44,13.44,13.44,13.44,13.44,17.64,22.68,25.2,26.04,28.56,26.04,37.8,88.2,91.56,79.8,73.92,75.6,25.2,26.88,26.04,25.2,20.16,15.12],
+  [16.8,15.12,16.8,15.12,15.12,15.96,22.68,26.88,49.56,46.2,49.56,59.64,64.68,131.88,141.96,136.92,124.32,109.2,51.24,58.8,57.12,52.08,34.44,18.48],
+  [21,20.16,19.32,19.32,18.48,39.48,41.16,104.16,128.52,141.96,153.72,148.68,186.48,213.36,221.76,192.36,200.76,180.6,137.76,144.48,141.96,129.36,78.96,25.2],
+  [67.2,68.88,71.4,64.68,43.68,47.88,38.64,63.84,73.92,79.8,90.72,91.56,149.52,200.76,207.48,199.08,178.92,159.6,106.68,105.84,96.6,83.16,77.28,80.64],
+  [24.36,25.2,24.36,24.36,24.36,23.52,27.72,172.2,173.04,91.56,95.76,106.68,171.36,223.44,238.56,226.8,199.08,180.6,110.88,85.68,78.96,71.4,51.24,25.2],
+  [51.24,20.16,20.16,19.32,19.32,18.48,34.44,69.72,81.48,93.24,103.32,110.04,150.36,184.8,187.32,183.12,177.24,171.36,104.16,83.16,70.56,67.2,48.72,38.64]
+];
+
+const solar_kw = [
+  [0,0,0,0,0,0,17.4,65.06,150.22,187.3,215.65,219.45,220.18,216.99,209.59,162.38,108.36,39.44,6.02,0,0,0,0,0],
+  [0,0,0,0,0,0,12.77,66.64,136.29,196.9,221.03,223.3,224.44,221.21,213.26,176.2,126.8,44.87,5.02,0,0,0,0,0],
+  [0,0,0,0,0,0,4.81,70.49,147.68,211.25,225.17,225.17,225.17,224.88,215.67,180.7,114.55,38.64,2.32,0,0,0,0,0],
+  [0,0,0,0,0,0,1.81,80.34,156.23,212.49,224.68,225.17,225.17,223.01,214.13,169.02,98.24,24.52,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,74.52,151.45,208.13,219.57,224.29,225.17,218.8,203.96,155.84,82.2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,65.62,139.51,194.38,216.23,221.38,221.64,217.09,200.47,150.19,79.81,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,56.85,131.3,187.05,214.32,219.65,220.54,217.1,211.26,154.39,86.22,2.6,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,63.5,132.6,189.21,215.42,221.63,222.97,219.08,208.43,158.62,91.74,5.98,0,0,0,0,0,0],
+  [0,0,0,0,0,0,18.02,97.49,176.24,214.25,220.68,222.31,221.81,216.92,198.59,164.14,91.54,14.66,0,0,0,0,0,0],
+  [0,0,0,0,0,0,26.92,103.33,182.71,212.45,225.17,221.86,221.05,215.82,193.81,150.22,75.38,14.51,0,0,0,0,0,0],
+  [0,0,0,0,0,2.77,25.99,97.08,169.43,213.05,218.78,219.8,218.93,221.46,186.67,134.97,67.19,20.1,0,0,0,0,0,0],
+  [0,0,0,0,0,2.83,24.4,89.9,158.65,208.36,216.08,220.18,219.58,214.5,190.86,161.87,96.52,26.92,4.79,0,0,0,0,0]
+];
+
+const ep = [2662.8,5453.28,6108.06,4160.52,4073.58,2931.6,1882.23,4177.74,5302.71,5503.05,5112.45,3932.04];
+const efp= [12627.09,22532.58,25641.63,15337.77,14943.18,11676.42,9338.28,16476.39,21940.8,22099.56,23826.81,18554.55];
+const maxVal = 238.56;
+
+// ── Build load table ───────────────────────────────────────────────────
+function buildMatrix(el, data, colorFn) {
+  let html = '<thead><tr><th class="row-head">Mês</th>';
+  HORAS.forEach(h => html += `<th>${String(h).padStart(2,'0')}h</th>`);
+  html += '</tr></thead><tbody>';
+  data.forEach((row, m) => {
+    html += `<tr><td class="row-label">${MESES[m]}</td>`;
+    row.forEach(v => {
+      const cls = colorFn(v);
+      html += `<td class="${cls}">${v > 0 ? v.toFixed(1) : '—'}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  el.innerHTML = html;
+}
+
+buildMatrix(document.getElementById('loadTable'), demanda, v => {
+  if (v === 0) return 'zero';
+  if (v > 180) return 'high-val';
+  return '';
+});
+
+buildMatrix(document.getElementById('solarTable'), solar_kw, v => {
+  if (v === 0) return 'zero';
+  if (v > 200) return 'high-val';
+  return '';
+});
+
+// ── Energia table ──────────────────────────────────────────────────────
+(function(){
+  let html = '<thead><tr><th>Posto</th>';
+  MESES.forEach(m => html += `<th>${m}</th>`);
+  html += '<th>Total</th></tr></thead><tbody>';
+  const rows = [
+    ['Ponta (kWh)', ep, 'ponta'],
+    ['Fora Ponta (kWh)', efp, 'fp'],
+    ['Consumo Equiv.', ep.map((p,i)=>p+efp[i]), ''],
+  ];
+  rows.forEach(([label, arr, cls]) => {
+    html += `<tr><td class="${cls}">${label}</td>`;
+    arr.forEach(v => html += `<td class="val ${cls}">${v.toLocaleString('pt-BR',{maximumFractionDigits:0})}</td>`);
+    html += `<td class="val">${arr.reduce((a,b)=>a+b,0).toLocaleString('pt-BR',{maximumFractionDigits:0})}</td></tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('energiaTable').innerHTML = html;
+})();
+
+// ── OPEX Grid table ────────────────────────────────────────────────────
+(function(){
+  const tusd_p = 1.326, tusd_fp_= 0.118, te_p = 0.379, te_fp_= 0.232, dem_spt=16.54;
+  const rows = [
+    ['OPEX TUSD Ponta', ep.map(e=>e*tusd_p),'ponta'],
+    ['OPEX TUSD FP',    efp.map(e=>e*tusd_fp_),'fp'],
+    ['OPEX TE Ponta',   ep.map(e=>e*te_p),'ponta'],
+    ['OPEX TE FP',      efp.map(e=>e*te_fp_),'fp'],
+    ['OPEX Demanda SPT',Array(12).fill(238.56*dem_spt),''],
+  ];
+  let html = '<thead><tr><th>Item</th>';
+  MESES.forEach(m => html += `<th>${m}</th>`);
+  html += '<th>Total Anual</th></tr></thead><tbody>';
+  rows.forEach(([label, arr, cls]) => {
+    html += `<tr><td class="${cls}">${label}</td>`;
+    arr.forEach(v => html += `<td class="val ${cls}">${v.toLocaleString('pt-BR',{maximumFractionDigits:0})}</td>`);
+    html += `<td class="val">${arr.reduce((a,b)=>a+b,0).toLocaleString('pt-BR',{maximumFractionDigits:0})}</td></tr>`;
+  });
+  // Total row
+  const totals = rows[0][1].map((_,i) => rows.reduce((s,r)=>s+r[1][i],0));
+  html += `<tr><td style="font-weight:700;color:var(--teal)">OPEX GRID TOTAL</td>`;
+  totals.forEach(v => html += `<td class="val" style="color:var(--teal)">${v.toLocaleString('pt-BR',{maximumFractionDigits:0})}</td>`);
+  html += `<td class="val" style="color:var(--teal);font-weight:700">${totals.reduce((a,b)=>a+b,0).toLocaleString('pt-BR',{maximumFractionDigits:0})}</td></tr>`;
+  html += '</tbody>';
+  document.getElementById('opexGridTable').innerHTML = html;
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════
+// MÓDULO GRID ZERO — Motor de cálculo (artigo Canal Solar N°33)
+// Dados reais: Estudo_Grid-Zero_2.xlsx
+// ═══════════════════════════════════════════════════════════════════
+
+// Dados da planilha: carga horária média diária (kWh/h ~ kW) e
+// perfil de geração normalizado por kWp (kWh/h/kWp)
+// Calculados pela média de todas as leituras agrupadas por hora do dia
+
+const GZ_DEMANDA_HORARIA = [
+  53.3, 52.1, 52.3, 51.8, 51.1, 51.2,  // 0h–5h
+  51.5, 62.5, 73.0, 77.5, 77.3, 77.4,  // 6h–11h
+  79.8, 80.3, 79.4, 78.1, 78.8, 77.2,  // 12h–17h
+  66.8, 67.4, 73.1, 73.4, 63.9, 54.3   // 18h–23h
+];
+
+// Perfil de irradiância normalizado (fração do pico solar médio)
+// baseado nos dados da planilha (coluna Solar 75 kW / 75)
+const GZ_PERFIL_SOLAR_NORM = [
+  0, 0, 0, 0, 0, 0.004,
+  0.16, 0.41, 0.63, 0.72, 0.74, 0.75,
+  0.74, 0.70, 0.62, 0.49, 0.33, 0.09,
+  0.002, 0, 0, 0, 0, 0
+];
+
+// Consumo anual estimado da planilha (~1.400 kWh/dia)
+const GZ_CONSUMO_DIARIO_KWH = GZ_DEMANDA_HORARIA.reduce((a,b) => a+b, 0);
+const GZ_CONSUMO_ANUAL_KWH  = GZ_CONSUMO_DIARIO_KWH * 365;
+
+// Estado atual do módulo GridZero
+let gzPotenciaKW = 25;
+let gzChart = null;
+
+// ── Gera curva de geração horária para uma dada potência CC (kWp) ──
+function gzGeracaoHoraria(kwp) {
+  // PR médio (Performance Ratio) com sobredimensionamento 32%
+  const pr = 0.78;
+  // Irradiância pico Brasil ~1000 W/m², HSP média ~5 h/dia
+  const fator_kw = kwp * pr;
+  return GZ_PERFIL_SOLAR_NORM.map(f => f * fator_kw);
+}
+
+// ── Cálculo de métricas GridZero ──────────────────────────────────
+function gzCalcularMetricas(kwAC, demanda, geracao) {
+  const kwp = kwAC * 1.32;
+  let autoconsumo_kwh = 0;
+  let geracao_total   = 0;
+  let consumo_total   = 0;
+  let excedente       = 0;
+
+  for (let h = 0; h < 24; h++) {
+    const gen = Math.min(geracao[h], kwAC);   // clipping GridZero
+    const carga = demanda[h];
+    const ac = Math.min(gen, carga);          // o que foi consumido do FV
+
+    autoconsumo_kwh += ac;
+    geracao_total   += gen;
+    consumo_total   += carga;
+    excedente       += Math.max(0, gen - carga);
+  }
+
+  const simultaneidade = geracao_total > 0 ? (autoconsumo_kwh / geracao_total) * 100 : 0;
+  const autoconsumo_pct= consumo_total > 0  ? (autoconsumo_kwh / consumo_total) * 100 : 0;
+  const gerac_anual    = geracao_total * 365;
+  const ac_anual       = autoconsumo_kwh * 365;
+
+  return { kwAC, kwp, simultaneidade, autoconsumo_pct, gerac_anual, ac_anual, consumo_anual: consumo_total * 365 };
+}
+
+// ── Cálculo Payback e VPL (metodologia artigo Canal Solar N°33) ──
+function gzCalcularFinanceiro(metricas) {
+  const te      = parseFloat(document.getElementById('gz-te').value) || 0.287;
+  const tusd    = parseFloat(document.getElementById('gz-tusd').value) || 0.388;
+  const icms    = parseFloat(document.getElementById('gz-icms').value) || 18;
+  const piscof  = parseFloat(document.getElementById('gz-piscofins').value) || 5;
+  const reaj    = parseFloat(document.getElementById('gz-reaj').value) || 5;
+  const capex_kwp = parseFloat(document.getElementById('gz-capex').value) || 3000;
+  const om_pct  = parseFloat(document.getElementById('gz-om').value) || 1;
+  const ipca    = parseFloat(document.getElementById('gz-ipca').value) || 4.5;
+  const tma     = parseFloat(document.getElementById('gz-tma').value) || 12;
+
+  // Tarifa total com tributos
+  const fator_trib = 1 + icms/100 + piscof/100;
+  const tarifa_kwh = (te + tusd) * fator_trib;
+
+  // CAPEX total
+  const capex_total = metricas.kwp * capex_kwp;
+  const om_anual    = capex_total * (om_pct / 100);
+
+  // Saving anual inicial (economia com energia no 1° ano)
+  const saving_ano0 = metricas.ac_anual * tarifa_kwh;
+
+  // Projeção 25 anos — VPL e Payback descontado (TMA 12%)
+  let vpl = -capex_total;
+  let payback = null;
+  let fc_acum = -capex_total;
+
+  for (let a = 1; a <= 25; a++) {
+    const fator_reaj  = Math.pow(1 + reaj/100, a);
+    const fator_ipca  = Math.pow(1 + ipca/100, a);
+    const saving_a    = saving_ano0 * fator_reaj;
+    const om_a        = om_anual * fator_ipca;
+    const fc_a        = saving_a - om_a;
+    const fator_desc  = Math.pow(1 + tma/100, a);
+
+    vpl     += fc_a / fator_desc;
+    fc_acum += fc_a;
+
+    if (payback === null && fc_acum >= 0) payback = a;
+  }
+
+  const vpl_kwp = vpl / metricas.kwp;
+
+  return { capex_total, saving_ano0, vpl, vpl_kwp, payback };
+}
+
+// ── Renderiza tabelas de resultados ───────────────────────────────
+function gzRenderizarTabelas() {
+  const potencias = [25, 50, 75, 100, 150];
+  const linhas = [
+    { id: 'payback',      label: 'PAYBACK DESCONTADO', fmt: v => v != null ? v.toFixed(2)+' anos' : 'N/A', cls: v => v && v < 4 ? 'pos' : v && v > 8 ? 'neg' : '' },
+    { id: 'simul',        label: 'SIMULTANEIDADE',     fmt: v => v.toFixed(2)+'%', cls: v => v > 90 ? 'pos' : v < 60 ? 'neg' : '' },
+    { id: 'autoconsumo',  label: 'AUTOCONSUMO DA GERAÇÃO', fmt: v => v.toFixed(2)+'%', cls: () => '' },
+    { id: 'vpl',          label: 'VPL (R$)',            fmt: v => 'R$ '+Math.round(v).toLocaleString('pt-BR'), cls: v => v > 0 ? 'pos' : 'neg' },
+  ];
+
+  const dados = potencias.map(kw => {
+    const gen = gzGeracaoHoraria(kw * 1.32);
+    const m   = gzCalcularMetricas(kw, GZ_DEMANDA_HORARIA, gen);
+    const f   = gzCalcularFinanceiro(m);
+    return { kw, m, f };
+  });
+
+  // Tabela principal
+  const tbody = document.getElementById('gz-tbody');
+  tbody.innerHTML = '';
+  linhas.forEach(linha => {
+    const tr = document.createElement('tr');
+    let cel = `<td style="font-weight:700;color:var(--text)">${linha.label}</td>`;
+    dados.forEach(d => {
+      let val;
+      if (linha.id === 'payback')     val = d.f.payback;
+      else if (linha.id === 'simul')  val = d.m.simultaneidade;
+      else if (linha.id === 'autoconsumo') val = d.m.autoconsumo_pct;
+      else if (linha.id === 'vpl')    val = d.f.vpl;
+      const cls = linha.cls(val);
+      cel += `<td class="val ${cls}">${linha.fmt(val)}</td>`;
+    });
+    tr.innerHTML = cel;
+    tbody.appendChild(tr);
+  });
+
+  // Tabela VPL/kWp
+  const kwpbody = document.getElementById('gz-kwp-tbody');
+  kwpbody.innerHTML = '';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td style="font-weight:700;color:var(--text)">Curva Real (planilha)</td>`;
+  dados.forEach(d => {
+    const vkwp = d.f.vpl_kwp;
+    tr.innerHTML += `<td class="val ${vkwp > 0 ? 'pos':'neg'}">${vkwp.toFixed(2)} R$/kW</td>`;
+  });
+  kwpbody.appendChild(tr);
+}
+
+// ── Atualiza KPIs do sistema selecionado ──────────────────────────
+function gzAtualizarKPIs() {
+  const kw  = gzPotenciaKW;
+  const kwp = kw * 1.32;
+  const gen = gzGeracaoHoraria(kwp);
+  const m   = gzCalcularMetricas(kw, GZ_DEMANDA_HORARIA, gen);
+  const f   = gzCalcularFinanceiro(m);
+
+  document.getElementById('gz-kw').textContent  = kw;
+  document.getElementById('gz-kwp').textContent = kwp.toFixed(0);
+  document.getElementById('gz-ac').textContent  = m.autoconsumo_pct.toFixed(1)+'%';
+  document.getElementById('gz-sim').textContent = m.simultaneidade.toFixed(1)+'%';
+  document.getElementById('gz-pb').textContent  = f.payback ? f.payback+' a' : 'N/A';
+  document.getElementById('gz-vpl').textContent = 'R$'+Math.round(f.vpl/1000)+'k';
+}
+
+// ── Renderiza gráfico Chart.js ─────────────────────────────────────
+function gzRenderizarGrafico() {
+  const ctx = document.getElementById('gzChart').getContext('2d');
+  const kw  = gzPotenciaKW;
+  const kwp = kw * 1.32;
+  const gen_raw = gzGeracaoHoraria(kwp);
+  const gen_gz  = gen_raw.map((g, h) => Math.min(g, kw));  // clipping GridZero
+  const exced   = gen_raw.map((g, h) => Math.max(0, g - GZ_DEMANDA_HORARIA[h]));
+  const labels  = Array.from({length:24}, (_,i) => `${String(i).padStart(2,'0')}h`);
+
+  if (gzChart) gzChart.destroy();
+
+  gzChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Carga (kW)',
+          data: GZ_DEMANDA_HORARIA,
+          borderColor: '#4fa3e0', backgroundColor: 'rgba(79,163,224,0.08)',
+          fill: true, tension: 0.35, borderWidth: 2.5, pointRadius: 0,
+        },
+        {
+          label: 'Geração FV (kW)',
+          data: gen_gz,
+          borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.12)',
+          fill: true, tension: 0.35, borderWidth: 2.5, pointRadius: 0,
+        },
+        {
+          label: 'Excedente cortado (GZ)',
+          data: exced,
+          borderColor: 'rgba(231,76,60,0.8)', backgroundColor: 'rgba(231,76,60,0.06)',
+          fill: true, tension: 0.35, borderWidth: 1.5, borderDash: [4,3], pointRadius: 0,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#7b8ab8', font: { size: 10 }, maxRotation: 0 }, border: { color: '#2a3350' } },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#7b8ab8', font: { size: 10 }, callback: v => v+'kW' },
+          border: { color: '#2a3350' },
+          title: { display: true, text: 'Potência (kW)', color: '#7b8ab8', font: { size: 10 } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(26,30,46,0.97)', borderColor: '#2a3350', borderWidth: 1,
+          callbacks: { label: i => `  ${i.dataset.label}: ${i.raw.toFixed(1)} kW` }
+        }
+      }
+    }
+  });
+}
+
+// ── Botão de seleção de potência ──────────────────────────────────
+function gzSelecionarPotencia(kw, el) {
+  gzPotenciaKW = kw;
+  document.querySelectorAll('[id^="btn-"][id$="kw"]').forEach(b => b.classList.remove('primary'));
+  if (el) el.classList.add('primary');
+  gzRenderizarGrafico();
+  gzAtualizarKPIs();
+}
+
+// ── Mudança de concessionária ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('gz-concessionaria');
+  if (sel) sel.addEventListener('change', () => {
+    const v = sel.value;
+    const tarifas = {
+      cpfl_b3: { te: 0.287, tusd: 0.388, icms: 18, piscofins: 5 },
+      cemig_a4: { te: 0.379, tusd: 0.440, icms: 12, piscofins: 3.65 },
+      manual:   null,
+    };
+    const t = tarifas[v];
+    if (t) {
+      document.getElementById('gz-te').value       = t.te;
+      document.getElementById('gz-tusd').value      = t.tusd;
+      document.getElementById('gz-icms').value      = t.icms;
+      document.getElementById('gz-piscofins').value = t.piscofins;
+    }
+    gzRecalcular();
+  });
+});
+
+// ── Recalcular tudo ────────────────────────────────────────────────
+function gzRecalcular() {
+  gzAtualizarKPIs();
+  gzRenderizarTabelas();
+  if (gzChart) gzRenderizarGrafico();
+}
+
+// ── Inicialização do módulo GridZero (chamada quando aba é aberta) ─
+function gzInit() {
+  if (!document.getElementById('gzChart')) return;
+  gzSelecionarPotencia(25, document.getElementById('btn-25kw'));
+  gzRenderizarTabelas();
+}
+
+function showTab(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById('panel-' + id);
+  if (panel) panel.classList.add('active');
+  if (el) el.classList.add('active');
+  if (id === 'gridzero') setTimeout(gzInit, 50);
+}
+</script>
+</body>
+</html>
