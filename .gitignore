@@ -41,3 +41,6 @@ Thumbs.db
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+
+# Dados reais de cliente (memória de massa, faturas) — não versionar
+.docs/massa/

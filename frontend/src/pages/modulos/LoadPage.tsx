@@ -5,6 +5,7 @@ import type { InputLoadPayload, LoadResumo } from "../../types";
 import {
   fmt, HORAS, matrizZerada, MESES, parseMatrizColada, vetorZerado,
 } from "./loadUtils";
+import { interpretar, lerPlanilha } from "./loadUpload";
 
 export function LoadPage() {
   const [matriz, setMatriz] = useState<number[][]>(matrizZerada);
@@ -15,6 +16,7 @@ export function LoadPage() {
   const [resumo, setResumo] = useState<LoadResumo | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [avisoUpload, setAvisoUpload] = useState<string | null>(null);
 
   // ── Derivados locais (preview imediato) ──────────────────────────────────
   const local = useMemo(() => {
@@ -40,6 +42,30 @@ export function LoadPage() {
     if (!colagem.trim()) return;
     setMatriz(parseMatrizColada(colagem));
     setColagem("");
+  };
+
+  const importarArquivo = async (file: File) => {
+    setErro(null);
+    setAvisoUpload(null);
+    setCarregando(true);
+    try {
+      const rows = await lerPlanilha(file);
+      const r = interpretar(rows);
+      if (!r.ok || !r.payload) {
+        setErro(r.aviso);
+        return;
+      }
+      setMatriz(r.payload.demanda_kw);
+      setPonta(r.payload.energia_ponta_kwh);
+      setFp(r.payload.energia_fp_kwh);
+      setDemandaManual(r.payload.demanda_maxima_kw);
+      setResumo(null);
+      setAvisoUpload(r.aviso);
+    } catch {
+      setErro("Falha ao ler o arquivo. Verifique o formato/codificação.");
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const carregarExemplo = async () => {
@@ -83,6 +109,7 @@ export function LoadPage() {
     setFp(vetorZerado());
     setDemandaManual(null);
     setResumo(null);
+    setAvisoUpload(null);
   };
 
   return (
@@ -93,6 +120,19 @@ export function LoadPage() {
           <span className="muted"> · memória de massa (demanda 12×24 + energia)</span>
         </div>
         <div className="perfil">
+          <label className="btn btn-google btn-sm" style={{ cursor: "pointer", margin: 0 }}>
+            Importar arquivo
+            <input
+              type="file"
+              accept=".csv,.tsv,.txt,.xlsx,.xls"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importarArquivo(f);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
           <button className="btn btn-ms btn-sm" disabled={carregando} onClick={() => void carregarExemplo()}>
             Carregar exemplo
           </button>
@@ -103,6 +143,7 @@ export function LoadPage() {
 
       <main>
         {erro && <p className="aviso">{erro}</p>}
+        {avisoUpload && <div className="resultado ok">{avisoUpload}</div>}
 
         {/* KPIs */}
         <div className="grid-kpis">
