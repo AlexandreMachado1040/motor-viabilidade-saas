@@ -56,6 +56,17 @@ yuriNEW/
   `<ProtectedRoute modulo="<m>">` no front.
 - **Navegação privada**: todo front de módulo fica atrás de `ProtectedRoute`.
 
+## Publicação (17/06/2026)
+
+- **GitHub:** `AlexandreMachado1040/motor-viabilidade-saas` — privado, branch `main`.
+  Auth do `gh` via keyring está quebrada; pushes exigem token com escopo `repo`
+  (clássico) — fine-grained somente-leitura dá `403` no push.
+- **Cloudflare Pages:** https://motor-viabilidade-saas.pages.dev (frontend estático).
+  Projeto `motor-viabilidade-saas`. Redeploy: `wrangler pages deploy frontend/dist
+  --project-name motor-viabilidade-saas --branch main`.
+- **Pendente p/ a app funcionar na nuvem:** hospedar o backend (host Python) e
+  apontar `VITE_API_URL` + `CORS_ORIGINS`/`FRONTEND_URL` para os domínios de produção.
+
 ## Pendência externa (sua)
 
 - Preencher credenciais OAuth em `backend/.env` (Google Cloud / Azure Portal).
