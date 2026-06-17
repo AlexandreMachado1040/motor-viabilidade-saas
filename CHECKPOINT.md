@@ -80,6 +80,26 @@ yuriNEW/
 - Frontend `pages/modulos/LoadPage.tsx` (rota privada `/modulos/load`): grid 12×24
   editável, colagem TSV pt-BR, energia mensal, KPIs e validação no servidor.
   O chip "load" do dashboard navega para a tela quando licenciado.
+- **Upload de memória de massa** (`loadUpload.ts`): auto-detecta export de
+  distribuidora (`dem`/`cons`, Latin-1, `;`, decimal vírgula, coluna "Postos
+  horários" → Ponta/FP), grade 12×24, ou fallback genérico. CSV/TSV + Excel
+  (SheetJS). Agrega em 12×24 + energia mensal. Validado com arquivo real
+  (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
+
+## Modo demonstração (Cloudflare) ✅
+
+- Flag `VITE_DEMO_MODE` (build): bypassa login (usuário convidado + todos os
+  módulos) e roda o InputLoad 100% no navegador (exemplo embutido + validação e
+  upload client-side). Dev local segue com login + backend reais.
+- Build demo: `cd frontend && VITE_DEMO_MODE=true npm run build` →
+  `wrangler pages deploy dist --project-name motor-viabilidade-saas --branch main`.
+- Para voltar ao modo com login: rebuildar SEM a flag e redeployar.
+
+## Servidores locais (dev)
+
+- Backend: `cd backend && uvicorn app.main:app --reload` (porta 8000).
+- Frontend: `cd frontend && npm run dev` (porta 5173). DEV_LOGIN_ENABLED=true →
+  caixa "Entrar (dev)" na tela de login.
 
 ## PRÓXIMO PASSO (retomar aqui) — Front do MOD 2 `InputGrid`
 
