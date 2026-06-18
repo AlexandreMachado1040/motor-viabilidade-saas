@@ -95,6 +95,19 @@ horários" → Ponta/FP), grade 12×24 ou fallback. CSV/TSV + Excel (SheetJS). G
 matriz 12×24 + energia mensal + **série diária** dos gráficos. Validado com arquivo
 real (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
 
+### Abas de análise (`AnaliseTabs.tsx` + `loadAnalise.ts`) — 18/06
+Tela do MOD 1 em abas: **Curva de Carga** (KPIs + 3 gráficos) · **P·Q·S** · **Fatores**.
+Gráficos SVG próprios com crosshair/tooltip. Identidade visual Aurova aplicada ao
+projeto inteiro (`styles.css`). LDC/Curva de Duração foi retirada do escopo.
+
+### Fator de Potência da memória de massa — 18/06
+`loadUpload.ts` lê as colunas de reativa (kVAr/kVArh indutivo/capacitivo) e calcula
+**FP por hora/posto, médio e período capacitivo** (`FPInfo`). Aba P·Q·S usa FP real
+(Q/S reais) quando há reativa; KPI de FP médio; alerta capacitivo. Sem reativa →
+slider manual. Separador decimal ponto/vírgula robusto; painel de falha de upload
+com `mailto` ao suporte Aurova (placeholder `suporte@aurova.com.br`).
+Arquivos reais em `.docs/massa/` (`dem_`, `cons_`, `powerfactor_`, gitignored).
+
 ### Campanha de Medição — ANEEL CTR via API (`campanhaAneel.ts`)
 Consulta o conjunto `ctr-curva-de-carga` (DataStore/CKAN), **sem baixar CSV**, em 2
 bases: **Rede Tipo** (rid `a77cacce-…`, subgrupo `NomSbgDes`) e **Consumidor Tipo**
