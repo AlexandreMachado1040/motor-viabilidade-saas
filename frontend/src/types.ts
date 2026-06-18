@@ -51,3 +51,14 @@ export interface LoadResumo {
   energia_equivalente_kwh: number[];
   pico_mensal_kw: number[];
 }
+
+/** Um dia real da memória de massa, para a análise diária ao longo do ano. */
+export interface DiaDemanda {
+  ano: number;
+  mes: number; // 1-12
+  dia: number; // 1-31
+  doy: number; // dia do ano (1-366, ref. bissexto)
+  total_kwh: number;
+  pico_kw: number;
+  perfil_kw: number[]; // 24 — kW médio por hora
+}

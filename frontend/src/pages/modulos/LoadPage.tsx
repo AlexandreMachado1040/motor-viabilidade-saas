@@ -1,48 +1,53 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getExemploLoad, validarLoad } from "../../api/modulos";
+import { validarLoad } from "../../api/modulos";
 import type { InputLoadPayload, LoadResumo } from "../../types";
 import {
-  fmt, HORAS, matrizZerada, MESES, parseMatrizColada, vetorZerado,
+  fmt, matrizZerada, serieDiariaDeMatriz, vetorZerado,
 } from "./loadUtils";
 import { interpretar, lerPlanilha } from "./loadUpload";
+import { DemandaDiariaChart } from "./DemandaDiariaChart";
+import { EnergiaMensalChart } from "./EnergiaMensalChart";
+import { carregarCampanha, DISTRIBUIDORAS, listarDemandantes, SUBGRUPOS } from "./campanhaAneel";
+import type { DiaDemanda } from "../../types";
 
 export function LoadPage() {
   const [matriz, setMatriz] = useState<number[][]>(matrizZerada);
   const [ponta, setPonta] = useState<number[]>(vetorZerado);
   const [fp, setFp] = useState<number[]>(vetorZerado);
   const [demandaManual, setDemandaManual] = useState<number | null>(null);
-  const [colagem, setColagem] = useState("");
   const [resumo, setResumo] = useState<LoadResumo | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [avisoUpload, setAvisoUpload] = useState<string | null>(null);
+  const [serieUpload, setSerieUpload] = useState<DiaDemanda[] | null>(null);
+  const [fonteSerie, setFonteSerie] = useState<string | null>(null);
+
+  // Campanha de Medição (curva-tipo ANEEL/CTR).
+  const [campAberta, setCampAberta] = useState(false);
+  const [sig, setSig] = useState("CEMIG");
+  const [sbg, setSbg] = useState<string>("A4");
+  const [demandantes, setDemandantes] = useState<string[]>([]);
+  const [dem, setDem] = useState<string>("");
+
+  // Série para o gráfico: real do arquivo/campanha (se houver) ou ano representativo da matriz.
+  const serieGrafico = useMemo(
+    () => serieUpload ?? serieDiariaDeMatriz(matriz),
+    [serieUpload, matriz],
+  );
+  const fonteGrafico = serieUpload
+    ? (fonteSerie ?? "memória de massa")
+    : "perfil mensal replicado (representativo — sem leituras brutas)";
 
   // ── Derivados locais (preview imediato) ──────────────────────────────────
   const local = useMemo(() => {
-    const picoMensal = matriz.map((linha) => Math.max(0, ...linha));
-    const picoGeral = Math.max(0, ...picoMensal);
+    const picoGeral = Math.max(0, ...matriz.map((linha) => Math.max(0, ...linha)));
     return {
-      picoMensal,
       demandaMaxima: demandaManual ?? picoGeral,
       pontaTotal: ponta.reduce((a, b) => a + b, 0),
       fpTotal: fp.reduce((a, b) => a + b, 0),
     };
   }, [matriz, ponta, fp, demandaManual]);
-
-  // ── Edição ───────────────────────────────────────────────────────────────
-  const setCelula = (i: number, j: number, v: number) =>
-    setMatriz((m) => m.map((lin, li) => (li === i ? lin.map((c, cj) => (cj === j ? v : c)) : lin)));
-
-  const setVetor = (
-    setter: React.Dispatch<React.SetStateAction<number[]>>, i: number, v: number,
-  ) => setter((arr) => arr.map((c, ci) => (ci === i ? v : c)));
-
-  const aplicarColagem = () => {
-    if (!colagem.trim()) return;
-    setMatriz(parseMatrizColada(colagem));
-    setColagem("");
-  };
 
   const importarArquivo = async (file: File) => {
     setErro(null);
@@ -59,6 +64,8 @@ export function LoadPage() {
       setPonta(r.payload.energia_ponta_kwh);
       setFp(r.payload.energia_fp_kwh);
       setDemandaManual(r.payload.demanda_maxima_kw);
+      setSerieUpload(r.serieDiaria && r.serieDiaria.length > 0 ? r.serieDiaria : null);
+      setFonteSerie("memória de massa (arquivo)");
       setResumo(null);
       setAvisoUpload(r.aviso);
     } catch {
@@ -68,18 +75,54 @@ export function LoadPage() {
     }
   };
 
-  const carregarExemplo = async () => {
+  // ── Campanha de Medição (curva-tipo ANEEL/CTR) ────────────────────────────
+  const buscarDemandantes = async (s: string, g: string) => {
     setErro(null);
     setCarregando(true);
     try {
-      const ex = await getExemploLoad();
-      setMatriz(ex.demanda_kw);
-      setPonta(ex.energia_ponta_kwh);
-      setFp(ex.energia_fp_kwh);
-      setDemandaManual(ex.demanda_maxima_kw);
-      setResumo(null);
+      const lista = await listarDemandantes(s, g);
+      setDemandantes(lista);
+      setDem(lista[0] ?? "");
+      if (lista.length === 0) setErro(`Sem curva-tipo para ${s} / ${g}. Tente outro subgrupo.`);
     } catch {
-      setErro("Falha ao carregar o exemplo (verifique a licença/servidor).");
+      setErro("Falha ao consultar a ANEEL (demandantes).");
+      setDemandantes([]); setDem("");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const trocarSelecao = (s: string, g: string) => {
+    setSig(s); setSbg(g);
+    void buscarDemandantes(s, g);
+  };
+
+  const toggleCampanha = () => {
+    const abrir = !campAberta;
+    setCampAberta(abrir);
+    if (abrir && demandantes.length === 0) void buscarDemandantes(sig, sbg);
+  };
+
+  const aplicarCampanha = async () => {
+    if (!dem) return;
+    setErro(null);
+    setCarregando(true);
+    try {
+      const res = await carregarCampanha(sig, sbg, dem);
+      setMatriz(res.payload.demanda_kw);
+      setPonta(res.payload.energia_ponta_kwh);
+      setFp(res.payload.energia_fp_kwh);
+      setDemandaManual(res.payload.demanda_maxima_kw);
+      setSerieUpload(res.serieDiaria);
+      setFonteSerie(`Campanha ANEEL · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
+      setResumo(null);
+      setAvisoUpload(
+        `Campanha de Medição aplicada — ANEEL/CTR · ${res.meta.sig} / ${res.meta.sbg} · `
+        + `${res.meta.demandante} · processo ${res.meta.ano} (${res.meta.processo}). `
+        + "Curva-tipo (Dia Útil/Sábado/Domingo) expandida em ano representativo.",
+      );
+    } catch {
+      setErro("Falha ao carregar a campanha de medição (ANEEL).");
     } finally {
       setCarregando(false);
     }
@@ -108,8 +151,14 @@ export function LoadPage() {
     setPonta(vetorZerado());
     setFp(vetorZerado());
     setDemandaManual(null);
+    setSerieUpload(null);
+    setFonteSerie(null);
     setResumo(null);
     setAvisoUpload(null);
+    // Fecha e reseta o quadro da Campanha de Medição.
+    setCampAberta(false);
+    setDemandantes([]);
+    setDem("");
   };
 
   return (
@@ -133,8 +182,8 @@ export function LoadPage() {
               }}
             />
           </label>
-          <button className="btn btn-ms btn-sm" disabled={carregando} onClick={() => void carregarExemplo()}>
-            Carregar exemplo
+          <button className="btn btn-ms btn-sm" disabled={carregando} onClick={toggleCampanha}>
+            Campanha de Medição
           </button>
           <button className="btn-link" onClick={limpar}>Limpar</button>
           <Link className="btn-link" to="/">← Voltar</Link>
@@ -145,6 +194,42 @@ export function LoadPage() {
         {erro && <p className="aviso">{erro}</p>}
         {avisoUpload && <div className="resultado ok">{avisoUpload}</div>}
 
+        {/* Campanha de Medição — seletor da curva-tipo ANEEL/CTR */}
+        {campAberta && (
+          <section className="painel">
+            <h3>Campanha de Medição — Curva-tipo ANEEL (CTR – Curva de Carga)</h3>
+            <p className="muted" style={{ marginTop: -6 }}>
+              Curvas de demanda de Rede/Consumidor Tipo das Revisões Tarifárias da ANEEL,
+              consultadas via API (sem baixar CSV).
+            </p>
+            <div className="linha-campos">
+              <label className="campo">
+                <span>Distribuidora</span>
+                <select value={sig} onChange={(e) => trocarSelecao(e.target.value, sbg)}>
+                  {DISTRIBUIDORAS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </label>
+              <label className="campo">
+                <span>Subgrupo (tensão)</span>
+                <select value={sbg} onChange={(e) => trocarSelecao(sig, e.target.value)}>
+                  {SUBGRUPOS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+              <label className="campo">
+                <span>Rede/Consumidor tipo</span>
+                <select value={dem} onChange={(e) => setDem(e.target.value)} disabled={demandantes.length === 0}>
+                  {demandantes.length === 0
+                    ? <option value="">—</option>
+                    : demandantes.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </label>
+            </div>
+            <button className="btn btn-google btn-sm" disabled={carregando || !dem} onClick={() => void aplicarCampanha()}>
+              {carregando ? "Consultando ANEEL…" : "Carregar curva"}
+            </button>
+          </section>
+        )}
+
         {/* KPIs */}
         <div className="grid-kpis">
           <Kpi titulo="Demanda máxima" valor={`${fmt(local.demandaMaxima, 2)} kW`} />
@@ -153,80 +238,11 @@ export function LoadPage() {
           <Kpi titulo="Energia total (ano)" valor={`${fmt(local.pontaTotal + local.fpTotal)} kWh`} />
         </div>
 
-        {/* Demanda manual + colagem */}
-        <section className="painel">
-          <div className="linha-campos">
-            <label className="campo">
-              <span>Demanda contratada/máx. (kW) — vazio = pico da matriz</span>
-              <input
-                type="number" step="0.01"
-                value={demandaManual ?? ""}
-                placeholder={fmt(local.demandaMaxima, 2)}
-                onChange={(e) => setDemandaManual(e.target.value === "" ? null : Number(e.target.value))}
-              />
-            </label>
-          </div>
-          <div className="colagem">
-            <textarea
-              value={colagem}
-              onChange={(e) => setColagem(e.target.value)}
-              placeholder="Cole aqui 12 linhas × 24 colunas da planilha (tab/; entre colunas, decimal pt-BR)…"
-              rows={3}
-            />
-            <button className="btn btn-ms btn-sm" onClick={aplicarColagem}>Aplicar colagem</button>
-          </div>
-        </section>
+        {/* Energia mensal — gráfico empilhado (Ponta + Fora-ponta) */}
+        <EnergiaMensalChart ponta={ponta} fp={fp} />
 
-        {/* Energia mensal */}
-        <section className="painel">
-          <h3>Energia mensal (kWh)</h3>
-          <div className="tabela-wrap">
-            <table className="tabela-energia">
-              <thead>
-                <tr><th>Mês</th><th>Ponta</th><th>Fora-ponta</th><th>Equivalente</th></tr>
-              </thead>
-              <tbody>
-                {MESES.map((mes, i) => (
-                  <tr key={mes}>
-                    <td>{mes}</td>
-                    <td><CelNum value={ponta[i]} onChange={(v) => setVetor(setPonta, i, v)} /></td>
-                    <td><CelNum value={fp[i]} onChange={(v) => setVetor(setFp, i, v)} /></td>
-                    <td className="ro">{fmt(ponta[i] + fp[i])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Matriz 12×24 */}
-        <section className="painel">
-          <h3>Memória de massa — demanda (kW) · 12 meses × 24 horas</h3>
-          <div className="tabela-wrap">
-            <table className="tabela-massa">
-              <thead>
-                <tr>
-                  <th className="sticky-col">Mês\\Hora</th>
-                  {HORAS.map((h) => <th key={h}>{h}h</th>)}
-                  <th>Pico</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MESES.map((mes, i) => (
-                  <tr key={mes}>
-                    <td className="sticky-col">{mes}</td>
-                    {HORAS.map((h) => (
-                      <td key={h}>
-                        <CelNum compact value={matriz[i][h]} onChange={(v) => setCelula(i, h, v)} />
-                      </td>
-                    ))}
-                    <td className="ro">{fmt(local.picoMensal[i])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {/* Análise diária ao longo do ano (sem recurso de API — client-side) */}
+        <DemandaDiariaChart serie={serieGrafico} fonte={fonteGrafico} />
 
         {/* Validação no servidor */}
         <section className="painel">
@@ -269,15 +285,3 @@ function Kpi({ titulo, valor }: { titulo: string; valor: string }) {
   );
 }
 
-function CelNum({
-  value, onChange, compact,
-}: { value: number; onChange: (v: number) => void; compact?: boolean }) {
-  return (
-    <input
-      type="number"
-      className={compact ? "cel-num compact" : "cel-num"}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value) || 0)}
-    />
-  );
-}

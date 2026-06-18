@@ -7,6 +7,16 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    proxy: {
+      // Proxy para a API de dados abertos da ANEEL (CTR – Curva de Carga).
+      // A ANEEL não envia CORS; o proxy resolve no dev. Em produção o mesmo
+      // caminho /aneel é servido pela Cloudflare Pages Function.
+      "/aneel": {
+        target: "https://dadosabertos.aneel.gov.br",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/aneel/, ""),
+      },
+    },
   },
   test: {
     environment: "jsdom",

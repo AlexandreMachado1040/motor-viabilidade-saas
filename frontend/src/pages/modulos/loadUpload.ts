@@ -1,10 +1,12 @@
 import * as XLSX from "xlsx";
-import type { InputLoadPayload } from "../../types";
+import type { DiaDemanda, InputLoadPayload } from "../../types";
+import { diaDoAno } from "./loadUtils";
 
 export interface ResultadoUpload {
   ok: boolean;
   tipo: "distribuidora" | "grade" | "desconhecido";
   payload?: InputLoadPayload;
+  serieDiaria?: DiaDemanda[];
   aviso: string;
 }
 
@@ -176,12 +178,25 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
   let maxKw = 0;
   let usaPosto = false;
 
+  // Acúmulo por dia real (chave ano-mês-dia) → série diária ao longo do ano.
+  interface DiaAcc { ano: number; mes: number; dia: number; kwh: number; pico: number; soma: number[]; cnt: number[]; }
+  const dias = new Map<string, DiaAcc>();
+
   for (const t of resolved) {
     const kw = c.isEnergia ? t.val / dt : t.val;
     const kwh = c.isEnergia ? t.val : t.val * dt;
     soma[t.mes - 1][t.hora] += kw;
     cnt[t.mes - 1][t.hora] += 1;
     if (kw > maxKw) maxKw = kw;
+
+    const dk = `${t.ano}-${t.mes}-${t.dia}`;
+    let d = dias.get(dk);
+    if (!d) { d = { ano: t.ano, mes: t.mes, dia: t.dia, kwh: 0, pico: 0, soma: Array(24).fill(0), cnt: Array(24).fill(0) }; dias.set(dk, d); }
+    d.kwh += kwh;
+    if (kw > d.pico) d.pico = kw;
+    d.soma[t.hora] += kw;
+    d.cnt[t.hora] += 1;
+
     let ehPonta: boolean;
     if (c.postoIdx >= 0 && t.posto) {
       usaPosto = true;
@@ -214,6 +229,23 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     fp[mes - 1] = +(sf / anos.size).toFixed(2);
   }
 
+  // Série diária: colapsa múltiplos anos num ano representativo (média por mês-dia).
+  interface Grp { mes: number; dia: number; kwh: number; pico: number; n: number; soma: number[]; cnt: number[]; }
+  const grp = new Map<string, Grp>();
+  for (const d of dias.values()) {
+    const k = `${d.mes}-${d.dia}`;
+    let g = grp.get(k);
+    if (!g) { g = { mes: d.mes, dia: d.dia, kwh: 0, pico: 0, n: 0, soma: Array(24).fill(0), cnt: Array(24).fill(0) }; grp.set(k, g); }
+    g.kwh += d.kwh; g.pico += d.pico; g.n += 1;
+    for (let h = 0; h < 24; h++) { g.soma[h] += d.soma[h]; g.cnt[h] += d.cnt[h]; }
+  }
+  const serieDiaria: DiaDemanda[] = [...grp.values()].map((g) => ({
+    ano: 0, mes: g.mes, dia: g.dia, doy: diaDoAno(g.mes, g.dia),
+    total_kwh: +(g.kwh / g.n).toFixed(2),
+    pico_kw: +(g.pico / g.n).toFixed(2),
+    perfil_kw: g.soma.map((s, h) => (g.cnt[h] > 0 ? +(s / g.cnt[h]).toFixed(2) : 0)),
+  })).sort((a, b) => a.doy - b.doy);
+
   const classif = usaPosto ? "Ponta/Fora-Ponta do arquivo" : "ponta estimada (seg–sex 18h–21h)";
   const tipoVal = c.isEnergia ? "consumo (kWh)" : "demanda (kW)";
   return {
@@ -222,6 +254,7 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
       demanda_maxima_kw: +maxKw.toFixed(2), demanda_kw: matriz,
       energia_ponta_kwh: ponta, energia_fp_kwh: fp,
     },
+    serieDiaria,
     aviso: `Importado ${tipoVal}: ${resolved.length.toLocaleString("pt-BR")} leituras · `
       + `intervalo ${Math.round(dt * 60)} min · ${classif}. Matriz 12×24 e energia mensal preenchidas.`,
   };
