@@ -1,21 +1,16 @@
 import type { DiaDemanda, InputLoadPayload } from "../../types";
 import { parseNumeroBR } from "./loadUtils";
 
-// Recurso "ctr-curvas-carga-redes-tipo.csv" no DataStore (CKAN) da ANEEL.
-const RID = "a77cacce-6a49-44c7-af20-508aecd4539d";
+// Duas bases do conjunto CTR – Curva de Carga (DataStore/CKAN da ANEEL).
+export type BaseId = "rede" | "consumidor";
+export interface BaseCtr { id: BaseId; rid: string; campoSub: string; label: string; }
 
-export const SUBGRUPOS = ["A2", "A3", "A4"] as const;
-
-// 43 distribuidoras presentes no recurso (levantadas via API, distinct SigCcs).
-export const DISTRIBUIDORAS = [
-  "AES SUL", "AME", "BANDEIRANTE", "CAIUÁ", "CEAL", "CEB", "CEEE", "CELESC",
-  "CELG", "CELPA", "CELTINS", "CEMAT", "CEMIG", "CERON", "CHESP", "CNEE",
-  "COCEL", "COELCE", "COPEL", "COSERN", "CPEE", "CPFL MOCOCA", "CPFL PAULISTA",
-  "CPFL PIRATININGA", "CPFL SANTA CRUZ", "CPFL SUL PAULISTA", "EFLJC", "EFLUL",
-  "ELETROACRE", "ELETROCAR", "ELETROPAULO", "ELFSM", "EMG", "ENERGISA BORBOREMA",
-  "ENERSUL", "ENF", "EPB", "ESCELSA", "ESE", "HIDROPAN", "IENERGIA",
-  "MUX ENERGIA", "UHENPAL",
+export const BASES_CTR: BaseCtr[] = [
+  { id: "rede", rid: "a77cacce-6a49-44c7-af20-508aecd4539d", campoSub: "NomSbgDes", label: "Rede Tipo" },
+  { id: "consumidor", rid: "b0418edb-038d-4fde-b624-c318d376a734", campoSub: "NomSubGrupoTarifario", label: "Consumidor Tipo" },
 ];
+
+const baseDe = (id: BaseId): BaseCtr => BASES_CTR.find((b) => b.id === id) ?? BASES_CTR[0];
 
 const TIPOS_DIA = ["Dia Útil", "Sábado", "Domingo"] as const;
 type TipoDia = (typeof TIPOS_DIA)[number];
@@ -25,16 +20,13 @@ const PONTA_HORAS = new Set([18, 19, 20]); // seg–sex 18h–21h
 export interface CampanhaResultado {
   payload: InputLoadPayload;
   serieDiaria: DiaDemanda[];
-  meta: { sig: string; sbg: string; demandante: string; ano: string; processo: string };
+  meta: { base: string; sig: string; sbg: string; demandante: string; ano: string; processo: string };
 }
 
-interface DSResult {
-  records: Record<string, string>[];
-  total: number;
-}
+interface DSResult { records: Record<string, string>[]; total: number; }
 
-async function ds(paramsObj: Record<string, string>): Promise<DSResult> {
-  const usp = new URLSearchParams({ resource_id: RID, ...paramsObj });
+async function ds(rid: string, paramsObj: Record<string, string>): Promise<DSResult> {
+  const usp = new URLSearchParams({ resource_id: rid, ...paramsObj });
   const r = await fetch(`/aneel/api/3/action/datastore_search?${usp.toString()}`);
   if (!r.ok) throw new Error(`ANEEL HTTP ${r.status}`);
   const j = await r.json();
@@ -42,20 +34,37 @@ async function ds(paramsObj: Record<string, string>): Promise<DSResult> {
   return j.result as DSResult;
 }
 
-/** Lista os "demandantes" (Rede/Consumidor Tipo) de uma distribuidora + subgrupo. */
-export async function listarDemandantes(sig: string, sbg: string): Promise<string[]> {
-  const res = await ds({
-    fields: "DscDemandante", distinct: "true", limit: "200",
-    filters: JSON.stringify({ SigCcs: sig, NomSbgDes: sbg }),
-  });
-  return res.records.map((r) => r.DscDemandante).filter(Boolean).sort();
+/** Distribuidoras (SigCcs) disponíveis na base escolhida. */
+export async function listarDistribuidoras(baseId: BaseId): Promise<string[]> {
+  const b = baseDe(baseId);
+  const res = await ds(b.rid, { fields: "SigCcs", distinct: "true", limit: "300" });
+  return res.records.map((r) => r.SigCcs).filter(Boolean).sort();
 }
 
-/** Escolhe o processo mais recente (ano máximo) para a combinação. */
-async function escolherProcesso(sig: string, sbg: string, dem: string) {
-  const res = await ds({
+/** Para uma distribuidora: subgrupos disponíveis + demandantes de cada subgrupo. */
+export async function listarOpcoes(baseId: BaseId, sig: string):
+  Promise<{ subgrupos: string[]; porSub: Record<string, string[]> }> {
+  const b = baseDe(baseId);
+  const res = await ds(b.rid, {
+    fields: `${b.campoSub},DscDemandante`, distinct: "true", limit: "1000",
+    filters: JSON.stringify({ SigCcs: sig }),
+  });
+  const porSub: Record<string, string[]> = {};
+  for (const r of res.records) {
+    const sub = r[b.campoSub], dem = r.DscDemandante;
+    if (!sub || !dem) continue;
+    (porSub[sub] ??= []);
+    if (!porSub[sub].includes(dem)) porSub[sub].push(dem);
+  }
+  for (const k of Object.keys(porSub)) porSub[k].sort();
+  return { subgrupos: Object.keys(porSub).sort(), porSub };
+}
+
+/** Processo mais recente (ano máximo) para a combinação. */
+async function escolherProcesso(b: BaseCtr, sig: string, sbg: string, dem: string) {
+  const res = await ds(b.rid, {
     fields: "AnoPrcCal,DscPrcCal", distinct: "true", limit: "200",
-    filters: JSON.stringify({ SigCcs: sig, NomSbgDes: sbg, DscDemandante: dem }),
+    filters: JSON.stringify({ SigCcs: sig, [b.campoSub]: sbg, DscDemandante: dem }),
   });
   if (res.records.length === 0) throw new Error("Sem processo de cálculo para a seleção.");
   let melhor = res.records[0];
@@ -64,11 +73,11 @@ async function escolherProcesso(sig: string, sbg: string, dem: string) {
 }
 
 /** Baixa as 3 curvas (Útil/Sábado/Domingo) e agrega cada uma em 24 valores horários. */
-async function curvasHorarias(sig: string, sbg: string, dem: string, ano: string, processo: string) {
-  const res = await ds({
+async function curvasHorarias(b: BaseCtr, sig: string, sbg: string, dem: string, ano: string, processo: string) {
+  const res = await ds(b.rid, {
     limit: "400",
     filters: JSON.stringify({
-      SigCcs: sig, NomSbgDes: sbg, DscDemandante: dem, AnoPrcCal: ano, DscPrcCal: processo,
+      SigCcs: sig, [b.campoSub]: sbg, DscDemandante: dem, AnoPrcCal: ano, DscPrcCal: processo,
     }),
   });
   const soma: Record<string, number[]> = {};
@@ -83,10 +92,7 @@ async function curvasHorarias(sig: string, sbg: string, dem: string, ano: string
     soma[tipo][h] += v; cnt[tipo][h] += 1;
   }
   const horaria: Record<TipoDia, number[]> = { "Dia Útil": [], "Sábado": [], "Domingo": [] };
-  for (const t of TIPOS_DIA) {
-    horaria[t] = soma[t].map((s, h) => (cnt[t][h] > 0 ? s / cnt[t][h] : 0));
-  }
-  // Fallback: se faltar Sábado/Domingo, usa o Dia Útil.
+  for (const t of TIPOS_DIA) horaria[t] = soma[t].map((s, h) => (cnt[t][h] > 0 ? s / cnt[t][h] : 0));
   const util = horaria["Dia Útil"];
   if (horaria["Sábado"].every((x) => x === 0)) horaria["Sábado"] = util;
   if (horaria["Domingo"].every((x) => x === 0)) horaria["Domingo"] = util;
@@ -100,9 +106,10 @@ function tipoDoDia(weekday: number): TipoDia {
 }
 
 /** Carrega a campanha de medição e monta o InputLoad (matriz 12×24 + energia + série diária). */
-export async function carregarCampanha(sig: string, sbg: string, dem: string): Promise<CampanhaResultado> {
-  const { ano, processo } = await escolherProcesso(sig, sbg, dem);
-  const horaria = await curvasHorarias(sig, sbg, dem, ano, processo);
+export async function carregarCampanha(baseId: BaseId, sig: string, sbg: string, dem: string): Promise<CampanhaResultado> {
+  const b = baseDe(baseId);
+  const { ano, processo } = await escolherProcesso(b, sig, sbg, dem);
+  const horaria = await curvasHorarias(b, sig, sbg, dem, ano, processo);
 
   // Ano representativo (2025, 365 dias contíguos) — perfil de cada dia pelo tipo (Útil/Sáb/Dom).
   const serieDiaria: DiaDemanda[] = [];
@@ -144,6 +151,6 @@ export async function carregarCampanha(sig: string, sbg: string, dem: string): P
       energia_fp_kwh: fp.map((v) => +v.toFixed(2)),
     },
     serieDiaria,
-    meta: { sig, sbg, demandante: dem, ano, processo },
+    meta: { base: b.label, sig, sbg, demandante: dem, ano, processo },
   };
 }

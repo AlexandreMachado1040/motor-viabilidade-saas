@@ -67,7 +67,7 @@ export function DemandaDiariaChart({ serie, fonte }: Props) {
 
   return (
     <section className="painel">
-      <GraficoDiario serie={serie} fonte={fonte} sel={sel} stats={stats}
+      <GraficoDiario serie={serie} fonte={fonte} sel={sel} hover={hover} stats={stats}
         onMover={diaMaisProximo} onSair={() => setHover(null)} onClicar={aoClicar} />
       <PerfilHorario dia={serie[sel]} fixo={fixo != null} />
     </section>
@@ -82,8 +82,8 @@ type Handlers = {
 
 // ── Topo: análise diária ao longo do ano (kWh/dia) ──────────────────────────
 function GraficoDiario({
-  serie, fonte, sel, stats, onMover, onSair, onClicar,
-}: Props & { sel: number; stats: { total: number; iPico: number; iMin: number } } & Handlers) {
+  serie, fonte, sel, hover, stats, onMover, onSair, onClicar,
+}: Props & { sel: number; hover: number | null; stats: { total: number; iPico: number; iMin: number } } & Handlers) {
   const ref = useRef<SVGSVGElement>(null);
   const H = 300, PH = H - MT - MB;
   const media = stats.total / serie.length;
@@ -127,6 +127,10 @@ function GraficoDiario({
           <line x1={xAno(dia.doy)} y1={MT} x2={xAno(dia.doy)} y2={MT + PH} stroke={C.cursor} strokeWidth={1.5} />
           <circle cx={xAno(dia.doy)} cy={y(dia.total_kwh)} r={4} fill={C.cursor} stroke={C.bg} strokeWidth={1.5} />
           <text x={xAno(dia.doy)} y={MT - 8} textAnchor="middle" fontSize={12} fill={C.cursor}>{dataBR(dia)}</text>
+          {hover != null && (
+            <Tip x={xAno(dia.doy)} y={y(dia.total_kwh)} H={H}
+              linhas={[`Dia ${dataBR(dia)}`, `${fmt(dia.total_kwh)} kWh · pico ${fmt(dia.pico_kw, 1)} kW`]} />
+          )}
           <text x={ML + PW / 2} y={H - 10} textAnchor="middle" fontSize={13} fill={C.txt}>Dia do ano</text>
         </svg>
       </div>
@@ -136,6 +140,8 @@ function GraficoDiario({
 
 // ── Baixo: perfil horário do dia selecionado (24 h, kW) ─────────────────────
 function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
+  const ref = useRef<SVGSVGElement>(null);
+  const [hh, setHH] = useState<number | null>(null);
   const H = 260, PH = H - MT - MB;
   const yMax = niceCeil(Math.max(1, ...dia.perfil_kw));
   const y = (v: number) => MT + PH - (v / yMax) * PH;
@@ -145,6 +151,14 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
   const area = `${linha} L${pts[23].x.toFixed(1)},${MT + PH} L${pts[0].x.toFixed(1)},${MT + PH} Z`;
   const ticks = Array.from({ length: 5 }, (_, i) => (yMax / 4) * i);
 
+  const aoMover = (e: React.MouseEvent) => {
+    const svg = ref.current; if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) / r.width) * W;
+    const h = Math.round(((mx - ML) / PW) * 23);
+    setHH(Math.max(0, Math.min(23, h)));
+  };
+
   return (
     <div style={{ marginTop: 16 }}>
       <h3>Perfil horário — {dataBR(dia)}</h3>
@@ -153,7 +167,8 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
         {fixo ? " · fixado (clique no gráfico de cima p/ soltar)" : " · passe o mouse no gráfico de cima"}
       </p>
       <div style={{ background: C.painel, borderRadius: 10, padding: "8px 4px" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        <svg ref={ref} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
+          onMouseMove={aoMover} onMouseLeave={() => setHH(null)}>
           <defs>
             <linearGradient id="grad-h" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={C.area0} /><stop offset="100%" stopColor={C.area1} />
@@ -169,10 +184,34 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
           ))}
           <path d={area} fill="url(#grad-h)" />
           <path d={linha} fill="none" stroke={C.linha} strokeWidth={2.2} strokeLinejoin="round" />
+          {hh != null && (
+            <>
+              <line x1={xh(hh)} y1={MT} x2={xh(hh)} y2={MT + PH} stroke={C.cursor} strokeWidth={1.2} />
+              <circle cx={xh(hh)} cy={y(dia.perfil_kw[hh])} r={3.5} fill={C.cursor} stroke={C.bg} strokeWidth={1.5} />
+              <Tip x={xh(hh)} y={y(dia.perfil_kw[hh])} H={H}
+                linhas={[`${hh}h–${hh + 1}h`, `${fmt(dia.perfil_kw[hh], 1)} kW`]} />
+            </>
+          )}
           <text x={ML + PW / 2} y={H - 10} textAnchor="middle" fontSize={13} fill={C.txt}>Hora do dia</text>
         </svg>
       </div>
     </div>
+  );
+}
+
+// ── Tooltip (caixa que segue o mouse) ───────────────────────────────────────
+function Tip({ x, y, H, linhas }: { x: number; y: number; H: number; linhas: string[] }) {
+  const w = Math.max(...linhas.map((l) => l.length)) * 6.4 + 16;
+  const h = linhas.length * 15 + 8;
+  let tx = x + 12; if (tx + w > ML + PW) tx = x - w - 12; if (tx < ML) tx = ML;
+  let ty = y - h - 10; if (ty < MT) ty = y + 14; if (ty + h > H - MB) ty = H - MB - h;
+  return (
+    <g pointerEvents="none">
+      <rect x={tx} y={ty} width={w} height={h} rx={6} fill="#0b1326" stroke={C.grid} />
+      {linhas.map((l, i) => (
+        <text key={i} x={tx + 8} y={ty + 15 + i * 15} fontSize={11} fill={C.txt}>{l}</text>
+      ))}
+    </g>
   );
 }
 

@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { validarLoad } from "../../api/modulos";
-import type { InputLoadPayload, LoadResumo } from "../../types";
 import {
   fmt, matrizZerada, serieDiariaDeMatriz, vetorZerado,
 } from "./loadUtils";
 import { interpretar, lerPlanilha } from "./loadUpload";
 import { DemandaDiariaChart } from "./DemandaDiariaChart";
 import { EnergiaMensalChart } from "./EnergiaMensalChart";
-import { carregarCampanha, DISTRIBUIDORAS, listarDemandantes, SUBGRUPOS } from "./campanhaAneel";
+import { BASES_CTR, carregarCampanha, listarDistribuidoras, listarOpcoes } from "./campanhaAneel";
+import type { BaseId } from "./campanhaAneel";
 import type { DiaDemanda } from "../../types";
 
 export function LoadPage() {
@@ -16,7 +15,6 @@ export function LoadPage() {
   const [ponta, setPonta] = useState<number[]>(vetorZerado);
   const [fp, setFp] = useState<number[]>(vetorZerado);
   const [demandaManual, setDemandaManual] = useState<number | null>(null);
-  const [resumo, setResumo] = useState<LoadResumo | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [avisoUpload, setAvisoUpload] = useState<string | null>(null);
@@ -25,10 +23,14 @@ export function LoadPage() {
 
   // Campanha de Medição (curva-tipo ANEEL/CTR).
   const [campAberta, setCampAberta] = useState(false);
-  const [sig, setSig] = useState("CEMIG");
-  const [sbg, setSbg] = useState<string>("A4");
-  const [demandantes, setDemandantes] = useState<string[]>([]);
-  const [dem, setDem] = useState<string>("");
+  const [base, setBase] = useState<BaseId>("rede");
+  const [distribuidoras, setDistribuidoras] = useState<string[]>([]);
+  const [sig, setSig] = useState("");
+  const [subgrupos, setSubgrupos] = useState<string[]>([]);
+  const [porSub, setPorSub] = useState<Record<string, string[]>>({});
+  const [sbg, setSbg] = useState("");
+  const [dem, setDem] = useState("");
+  const demandantes = porSub[sbg] ?? [];
 
   // Série para o gráfico: real do arquivo/campanha (se houver) ou ano representativo da matriz.
   const serieGrafico = useMemo(
@@ -66,7 +68,6 @@ export function LoadPage() {
       setDemandaManual(r.payload.demanda_maxima_kw);
       setSerieUpload(r.serieDiaria && r.serieDiaria.length > 0 ? r.serieDiaria : null);
       setFonteSerie("memória de massa (arquivo)");
-      setResumo(null);
       setAvisoUpload(r.aviso);
     } catch {
       setErro("Falha ao ler o arquivo. Verifique o formato/codificação.");
@@ -76,71 +77,68 @@ export function LoadPage() {
   };
 
   // ── Campanha de Medição (curva-tipo ANEEL/CTR) ────────────────────────────
-  const buscarDemandantes = async (s: string, g: string) => {
-    setErro(null);
-    setCarregando(true);
+  // Carrega opções (subgrupos + demandantes) de uma distribuidora.
+  const carregarOpcoesDist = async (b: BaseId, s: string) => {
+    const { subgrupos: subs, porSub: mapa } = await listarOpcoes(b, s);
+    setSubgrupos(subs); setPorSub(mapa);
+    const sb0 = subs[0] ?? "";
+    setSbg(sb0); setDem(mapa[sb0]?.[0] ?? "");
+    if (subs.length === 0) setErro(`Sem curva-tipo para ${s} nesta base.`);
+  };
+
+  // Carrega distribuidoras da base e abre a 1ª.
+  const carregarBase = async (b: BaseId) => {
+    setErro(null); setCarregando(true);
     try {
-      const lista = await listarDemandantes(s, g);
-      setDemandantes(lista);
-      setDem(lista[0] ?? "");
-      if (lista.length === 0) setErro(`Sem curva-tipo para ${s} / ${g}. Tente outro subgrupo.`);
+      const dists = await listarDistribuidoras(b);
+      setDistribuidoras(dists);
+      const s0 = dists[0] ?? "";
+      setSig(s0);
+      if (s0) await carregarOpcoesDist(b, s0);
+      else { setSubgrupos([]); setPorSub({}); setSbg(""); setDem(""); }
     } catch {
-      setErro("Falha ao consultar a ANEEL (demandantes).");
-      setDemandantes([]); setDem("");
+      setErro("Falha ao consultar a ANEEL (distribuidoras).");
     } finally {
       setCarregando(false);
     }
   };
 
-  const trocarSelecao = (s: string, g: string) => {
-    setSig(s); setSbg(g);
-    void buscarDemandantes(s, g);
+  const trocarBase = (b: BaseId) => { setBase(b); void carregarBase(b); };
+
+  const trocarDistribuidora = async (s: string) => {
+    setSig(s); setErro(null); setCarregando(true);
+    try { await carregarOpcoesDist(base, s); }
+    catch { setErro("Falha ao consultar a ANEEL (subgrupos)."); setSubgrupos([]); setPorSub({}); setSbg(""); setDem(""); }
+    finally { setCarregando(false); }
   };
+
+  const trocarSubgrupo = (sb: string) => { setSbg(sb); setDem(porSub[sb]?.[0] ?? ""); };
 
   const toggleCampanha = () => {
     const abrir = !campAberta;
     setCampAberta(abrir);
-    if (abrir && demandantes.length === 0) void buscarDemandantes(sig, sbg);
+    if (abrir && distribuidoras.length === 0) void carregarBase(base);
   };
 
   const aplicarCampanha = async () => {
-    if (!dem) return;
+    if (!sig || !sbg || !dem) return;
     setErro(null);
     setCarregando(true);
     try {
-      const res = await carregarCampanha(sig, sbg, dem);
+      const res = await carregarCampanha(base, sig, sbg, dem);
       setMatriz(res.payload.demanda_kw);
       setPonta(res.payload.energia_ponta_kwh);
       setFp(res.payload.energia_fp_kwh);
       setDemandaManual(res.payload.demanda_maxima_kw);
       setSerieUpload(res.serieDiaria);
-      setFonteSerie(`Campanha ANEEL · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
-      setResumo(null);
+      setFonteSerie(`Campanha ANEEL · ${res.meta.base} · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
       setAvisoUpload(
-        `Campanha de Medição aplicada — ANEEL/CTR · ${res.meta.sig} / ${res.meta.sbg} · `
+        `Campanha de Medição aplicada — ANEEL/CTR · ${res.meta.base} · ${res.meta.sig} / ${res.meta.sbg} · `
         + `${res.meta.demandante} · processo ${res.meta.ano} (${res.meta.processo}). `
         + "Curva-tipo (Dia Útil/Sábado/Domingo) expandida em ano representativo.",
       );
     } catch {
       setErro("Falha ao carregar a campanha de medição (ANEEL).");
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  const validar = async () => {
-    setErro(null);
-    setCarregando(true);
-    const payload: InputLoadPayload = {
-      demanda_maxima_kw: demandaManual,
-      demanda_kw: matriz,
-      energia_ponta_kwh: ponta,
-      energia_fp_kwh: fp,
-    };
-    try {
-      setResumo(await validarLoad(payload));
-    } catch {
-      setErro("Falha ao validar no servidor.");
     } finally {
       setCarregando(false);
     }
@@ -153,12 +151,13 @@ export function LoadPage() {
     setDemandaManual(null);
     setSerieUpload(null);
     setFonteSerie(null);
-    setResumo(null);
     setAvisoUpload(null);
     // Fecha e reseta o quadro da Campanha de Medição.
     setCampAberta(false);
-    setDemandantes([]);
-    setDem("");
+    setDistribuidoras([]);
+    setSubgrupos([]);
+    setPorSub({});
+    setSig(""); setSbg(""); setDem("");
   };
 
   return (
@@ -170,7 +169,7 @@ export function LoadPage() {
         </div>
         <div className="perfil">
           <label className="btn btn-google btn-sm" style={{ cursor: "pointer", margin: 0 }}>
-            Importar arquivo
+            Memória de Massa
             <input
               type="file"
               accept=".csv,.tsv,.txt,.xlsx,.xls"
@@ -204,19 +203,29 @@ export function LoadPage() {
             </p>
             <div className="linha-campos">
               <label className="campo">
+                <span>Base</span>
+                <select value={base} onChange={(e) => trocarBase(e.target.value as BaseId)}>
+                  {BASES_CTR.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+                </select>
+              </label>
+              <label className="campo">
                 <span>Distribuidora</span>
-                <select value={sig} onChange={(e) => trocarSelecao(e.target.value, sbg)}>
-                  {DISTRIBUIDORAS.map((d) => <option key={d} value={d}>{d}</option>)}
+                <select value={sig} onChange={(e) => void trocarDistribuidora(e.target.value)} disabled={distribuidoras.length === 0}>
+                  {distribuidoras.length === 0
+                    ? <option value="">—</option>
+                    : distribuidoras.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </label>
               <label className="campo">
-                <span>Subgrupo (tensão)</span>
-                <select value={sbg} onChange={(e) => trocarSelecao(sig, e.target.value)}>
-                  {SUBGRUPOS.map((s) => <option key={s} value={s}>{s}</option>)}
+                <span>Subgrupo</span>
+                <select value={sbg} onChange={(e) => trocarSubgrupo(e.target.value)} disabled={subgrupos.length === 0}>
+                  {subgrupos.length === 0
+                    ? <option value="">—</option>
+                    : subgrupos.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
               <label className="campo">
-                <span>Rede/Consumidor tipo</span>
+                <span>{base === "rede" ? "Rede tipo" : "Consumidor tipo"}</span>
                 <select value={dem} onChange={(e) => setDem(e.target.value)} disabled={demandantes.length === 0}>
                   {demandantes.length === 0
                     ? <option value="">—</option>
@@ -243,34 +252,6 @@ export function LoadPage() {
 
         {/* Análise diária ao longo do ano (sem recurso de API — client-side) */}
         <DemandaDiariaChart serie={serieGrafico} fonte={fonteGrafico} />
-
-        {/* Validação no servidor */}
-        <section className="painel">
-          <button className="btn btn-google" disabled={carregando} onClick={() => void validar()}>
-            {carregando ? "Processando…" : "Validar no servidor"}
-          </button>
-
-          {resumo && (
-            <div className={`resultado ${resumo.valido ? "ok" : "falha"}`}>
-              {resumo.valido ? (
-                <>
-                  <strong>✓ Memória de massa válida</strong>
-                  <div className="grid-kpis">
-                    <Kpi titulo="Demanda máx. (motor)" valor={`${fmt(resumo.demanda_maxima_kw, 2)} kW`} />
-                    <Kpi titulo="Ponta total" valor={`${fmt(resumo.energia_ponta_total)} kWh`} />
-                    <Kpi titulo="Fora-ponta total" valor={`${fmt(resumo.energia_fp_total)} kWh`} />
-                    <Kpi titulo="Total" valor={`${fmt(resumo.energia_total)} kWh`} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <strong>✗ Há inconsistências:</strong>
-                  <ul>{resumo.erros.map((e) => <li key={e}>{e}</li>)}</ul>
-                </>
-              )}
-            </div>
-          )}
-        </section>
       </main>
     </div>
   );

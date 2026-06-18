@@ -1,6 +1,6 @@
 # CHECKPOINT — Motor de Viabilidade (SaaS modular)
 
-> Última atualização: 16/06/2026 · Ponto de retomada do trabalho.
+> Última atualização: 17/06/2026 · Ponto de retomada do trabalho.
 
 ## Visão geral
 
@@ -72,19 +72,40 @@ yuriNEW/
 - Preencher credenciais OAuth em `backend/.env` (Google Cloud / Azure Portal).
   Sem isso a API sobe, mas o login social não completa.
 
-## MOD 1 `InputLoad` — CONCLUÍDO ✅
+## MOD 1 `InputLoad` — CONCLUÍDO ✅ (visual reformulado 17/06)
 
 - Backend `app/modulos/load/` (`POST /validar`, `GET /exemplo`) + `app/integracao/motor.py`
   (bootstrap de `sys.path` p/ importar `motor_viabilidade`). Rotas privadas via
-  `require_module("load")`.
-- Frontend `pages/modulos/LoadPage.tsx` (rota privada `/modulos/load`): grid 12×24
-  editável, colagem TSV pt-BR, energia mensal, KPIs e validação no servidor.
-  O chip "load" do dashboard navega para a tela quando licenciado.
-- **Upload de memória de massa** (`loadUpload.ts`): auto-detecta export de
-  distribuidora (`dem`/`cons`, Latin-1, `;`, decimal vírgula, coluna "Postos
-  horários" → Ponta/FP), grade 12×24, ou fallback genérico. CSV/TSV + Excel
-  (SheetJS). Agrega em 12×24 + energia mensal. Validado com arquivo real
-  (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
+  `require_module("load")`. Chip "load" do dashboard navega quando licenciado.
+- Frontend `pages/modulos/LoadPage.tsx` (rota privada `/modulos/load`) — tela só de
+  visualização, entrada por **Memória de Massa** (upload) e **Campanha de Medição**.
+  Removidos: tabela 12×24, tabela de energia, demanda manual, colagem, botão "Validar".
+
+### Gráficos (SVG próprio, sem lib) — identidade `aurova-motor-ui.pages.dev`
+Paleta/tema em `pages/modulos/chartTheme.ts` (fundo azul translúcido, clean):
+- **Energia mensal** (`EnergiaMensalChart.tsx`): barras empilhadas Ponta (ciano) +
+  Fora-ponta (esmeralda), barras finas (`band·0,42`), média âmbar, tooltip por mês.
+- **Análise diária** (`DemandaDiariaChart.tsx`): área esmeralda kWh/dia ao longo do
+  ano, média âmbar, pico vermelho, cursor ciano, tooltip/crosshair no hover.
+- **Perfil horário**: área/linha esmeralda 24 h do dia selecionado, crosshair+tooltip.
+
+### Upload de memória de massa (`loadUpload.ts`)
+Auto-detecta export de distribuidora (Latin-1, `;`, decimal vírgula, coluna "Postos
+horários" → Ponta/FP), grade 12×24 ou fallback. CSV/TSV + Excel (SheetJS). Gera
+matriz 12×24 + energia mensal + **série diária** dos gráficos. Validado com arquivo
+real (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
+
+### Campanha de Medição — ANEEL CTR via API (`campanhaAneel.ts`)
+Consulta o conjunto `ctr-curva-de-carga` (DataStore/CKAN), **sem baixar CSV**, em 2
+bases: **Rede Tipo** (rid `a77cacce-…`, subgrupo `NomSbgDes`) e **Consumidor Tipo**
+(rid `b0418edb-…`, subgrupo `NomSubGrupoTarifario`). Seletor em cascata dinâmico
+(Base → Distribuidora → Subgrupo → Rede/Consumidor tipo). Baixa as 3 curvas
+(Útil/Sáb/Dom, 96 blocos de 15 min, pinando ano+processo mais recente), agrega em
+24 h e expande num ano representativo (2025) → matriz 12×24 + energia mensal Ponta/FP
++ série diária. A ANEEL **não envia CORS** → proxy same-origin `/aneel`:
+`server.proxy` do Vite (`vite.config.ts`, dev) + **Cloudflare Pages Function**
+`frontend/functions/aneel/[[path]].js` (demo). Em produção c/ login, rotear por
+endpoint autenticado no backend.
 
 ## Modo demonstração (Cloudflare) ✅
 

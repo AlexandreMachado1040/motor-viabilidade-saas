@@ -27,7 +27,7 @@ export function EnergiaMensalChart({ ponta, fp }: Props) {
   const y = (v: number) => MT + PH - (v / yMax) * PH;
   const ticks = Array.from({ length: 5 }, (_, i) => (yMax / 4) * i);
   const band = PW / 12;
-  const bw = band * 0.6;
+  const bw = band * 0.42; // 30% mais fina que o padrão anterior (0,6)
   const cx = (i: number) => ML + band * (i + 0.5);
   const sel = hover;
 
@@ -81,10 +81,30 @@ export function EnergiaMensalChart({ ponta, fp }: Props) {
           <line x1={ML} y1={y(media)} x2={ML + PW} y2={y(media)} stroke={C.media} strokeWidth={1.6} strokeDasharray="7 5" />
           <text x={ML + PW + 6} y={y(media) + 4} fontSize={12} fill={C.media}>Média</text>
 
+          {/* Tooltip do mês sob o mouse */}
+          {sel != null && <TipMes i={sel} cx={cx(sel)} topo={y(total[sel])}
+            mes={MESES[sel]} total={total[sel]} ponta={ponta[sel]} fp={fp[sel]} />}
+
           <text x={ML + PW / 2} y={H - 10} textAnchor="middle" fontSize={13} fill={C.txt}>Mês</text>
         </svg>
       </div>
     </section>
+  );
+}
+
+function TipMes({ cx, topo, mes, total, ponta, fp }: {
+  i: number; cx: number; topo: number; mes: string; total: number; ponta: number; fp: number;
+}) {
+  const linhas = [mes, `Total ${fmt(total)} kWh`, `Ponta ${fmt(ponta)} · FP ${fmt(fp)}`];
+  const w = Math.max(...linhas.map((l) => l.length)) * 6.2 + 16;
+  const h = linhas.length * 15 + 8;
+  let tx = cx + 12; if (tx + w > ML + PW) tx = cx - w - 12; if (tx < ML) tx = ML;
+  let ty = topo - h - 8; if (ty < MT) ty = MT;
+  return (
+    <g pointerEvents="none">
+      <rect x={tx} y={ty} width={w} height={h} rx={6} fill="#0b1326" stroke={C.grid} />
+      {linhas.map((l, i) => <text key={i} x={tx + 8} y={ty + 15 + i * 15} fontSize={11} fill={C.txt}>{l}</text>)}
+    </g>
   );
 }
 
