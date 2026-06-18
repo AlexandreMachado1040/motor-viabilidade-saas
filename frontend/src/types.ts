@@ -52,6 +52,18 @@ export interface LoadResumo {
   pico_mensal_kw: number[];
 }
 
+/** Fator de potência extraído da memória de massa (colunas de reativa). */
+export interface FPInfo {
+  pPorHora: number[];    // 24 — potência ativa média (kW) por hora
+  qPorHora: number[];    // 24 — potência reativa média (kVAr) por hora
+  fpPorHora: number[];   // 24 — FP por hora
+  capPorHora: boolean[]; // 24 — hora com reativo capacitivo predominante
+  medio: number;         // FP médio global
+  ponta: number;         // FP médio na ponta
+  fora: number;          // FP médio fora-ponta
+  fonte: string;         // origem (demanda kVAr / consumo kVArh)
+}
+
 /** Um dia real da memória de massa, para a análise diária ao longo do ano. */
 export interface DiaDemanda {
   ano: number;

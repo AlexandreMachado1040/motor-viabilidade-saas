@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { DiaDemanda, InputLoadPayload } from "../../types";
+import type { DiaDemanda, FPInfo, InputLoadPayload } from "../../types";
 import { diaDoAno } from "./loadUtils";
 
 export interface ResultadoUpload {
@@ -7,6 +7,7 @@ export interface ResultadoUpload {
   tipo: "distribuidora" | "grade" | "desconhecido";
   payload?: InputLoadPayload;
   serieDiaria?: DiaDemanda[];
+  fp?: FPInfo;
   aviso: string;
 }
 
@@ -20,16 +21,29 @@ function norm(s: unknown): string {
     .replace(/\s+/g, " ").trim();
 }
 
-/** Converte célula em número (pt-BR: "1.234,56" / "58,8"), ou null. */
+/**
+ * Converte célula em número detectando o separador decimal — PONTO ou VÍRGULA.
+ * Regra: quando há os dois, o que aparece por último é o decimal e o outro é
+ * separador de milhar ("1.234,56" e "1,234.56" → 1234.56). Com só um tipo, a
+ * última ocorrência é o decimal e as anteriores são milhar.
+ */
 function celulaNumero(c: unknown): number | null {
-  const s = String(c ?? "").trim();
+  let s = String(c ?? "").trim();
   if (s === "" || s === "-") return null;
   if (!/\d/.test(s)) return null;
-  let n = s.replace(/\s/g, "");
-  if (n.includes(".") && n.includes(",")) n = n.replace(/\./g, "").replace(",", ".");
-  else if (n.includes(",")) n = n.replace(",", ".");
-  if (!/^-?\d+(\.\d+)?$/.test(n)) return null;
-  const v = Number(n);
+  s = s.replace(/\s/g, "");
+  const ld = s.lastIndexOf("."), lc = s.lastIndexOf(",");
+  if (ld >= 0 && lc >= 0) {
+    s = lc > ld
+      ? s.replace(/\./g, "").replace(",", ".")  // vírgula é o decimal (pt-BR)
+      : s.replace(/,/g, "");                      // ponto é o decimal (intl)
+  } else if (lc >= 0) {
+    s = s.slice(0, lc).replace(/,/g, "") + "." + s.slice(lc + 1);
+  } else if (ld >= 0 && (s.match(/\./g) || []).length > 1) {
+    s = s.slice(0, ld).replace(/\./g, "") + "." + s.slice(ld + 1);
+  }
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  const v = Number(s);
   return Number.isNaN(v) ? null : v;
 }
 
@@ -55,15 +69,17 @@ function parseMomento(dataCell: string, timeCell?: string):
   return { ano, mes, dia, hora };
 }
 
+/** Escolhe o delimitador (`;`, tab ou `,`) que melhor divide as linhas em colunas. */
 function detectarDelimitador(linhas: string[]): string {
-  const amostra = linhas.slice(0, 5).join("\n");
-  const ponto = (amostra.match(/;/g) || []).length;
-  const tab = (amostra.match(/\t/g) || []).length;
-  const virg = (amostra.match(/,/g) || []).length;
-  if (ponto > 0 && ponto >= tab) return ";";
-  if (tab > 0) return "\t";
-  if (virg > 0) return ",";
-  return ";";
+  const cands = [";", "\t", ","];
+  const amostra = linhas.slice(0, 8);
+  let melhor = ";", melhorCols = 0;
+  for (const d of cands) {
+    const cols = amostra.map((l) => l.split(d).length).sort((a, b) => a - b);
+    const mediana = cols[Math.floor(cols.length / 2)] || 1; // robusta a linhas atípicas
+    if (mediana > melhorCols) { melhorCols = mediana; melhor = d; }
+  }
+  return melhor;
 }
 
 /** Lê o arquivo (CSV/TSV/TXT com detecção de encoding, ou XLSX) → matriz de strings. */
@@ -105,8 +121,11 @@ export function interpretar(rows: string[][]): ResultadoUpload {
     if (valIdx < 0) valIdx = cab.findIndex((c, i) =>
       i !== dateIdx && i !== horaIdx && i !== postoIdx && /kwh|\bkw\b/.test(c));
     const isEnergia = valIdx >= 0 && (cab[valIdx].includes("kwh") || cab[valIdx].includes("consumo"));
+    // Colunas de reativa (kVAr/kVArh) fornecida — indutivo e capacitivo.
+    const qIndIdx = cab.findIndex((c) => /kvar/.test(c) && c.includes("indutivo") && !c.includes("receb"));
+    const qCapIdx = cab.findIndex((c) => /kvar/.test(c) && c.includes("capacit") && !c.includes("receb"));
     if (dateIdx >= 0 && valIdx >= 0) {
-      return agregar(rows.slice(head + 1), { dateIdx, horaIdx, postoIdx, valIdx, isEnergia });
+      return agregar(rows.slice(head + 1), { dateIdx, horaIdx, postoIdx, valIdx, isEnergia, qIndIdx, qCapIdx });
     }
   }
 
@@ -129,12 +148,13 @@ export function interpretar(rows: string[][]): ResultadoUpload {
   };
 }
 
-interface Cols { dateIdx: number; horaIdx: number; postoIdx: number; valIdx: number; isEnergia: boolean; }
+interface Cols { dateIdx: number; horaIdx: number; postoIdx: number; valIdx: number; isEnergia: boolean; qIndIdx: number; qCapIdx: number; }
 
 function agregar(body: string[][], c: Cols): ResultadoUpload {
-  interface T { ano: number; mes: number; dia: number; hora1b: number | null; horaTs: number | null; val: number; posto: string; }
+  interface T { ano: number; mes: number; dia: number; hora1b: number | null; horaTs: number | null; val: number; qInd: number; qCap: number; posto: string; }
   const tmp: T[] = [];
   const horas1b = new Set<number>();
+  const temReativa = c.qIndIdx >= 0 || c.qCapIdx >= 0;
 
   for (const r of body) {
     const val = celulaNumero(r[c.valIdx]);
@@ -149,6 +169,8 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     tmp.push({
       ano: mom.ano, mes: mom.mes, dia: mom.dia,
       hora1b, horaTs: mom.hora, val,
+      qInd: c.qIndIdx >= 0 ? Math.abs(celulaNumero(r[c.qIndIdx]) ?? 0) : 0,
+      qCap: c.qCapIdx >= 0 ? Math.abs(celulaNumero(r[c.qCapIdx]) ?? 0) : 0,
       posto: norm(c.postoIdx >= 0 ? r[c.postoIdx] : ""),
     });
   }
@@ -177,6 +199,12 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
   const fAM = new Map<string, number>();
   let maxKw = 0;
   let usaPosto = false;
+
+  // Acumuladores de FP (reativa): por hora e por posto.
+  const somaPh = Array(24).fill(0), somaQh = Array(24).fill(0);
+  const somaQindh = Array(24).fill(0), somaQcaph = Array(24).fill(0);
+  const cntPh = Array(24).fill(0);
+  let totP = 0, totQ = 0, eaPonta = 0, erPonta = 0, eaFora = 0, erFora = 0;
 
   // Acúmulo por dia real (chave ano-mês-dia) → série diária ao longo do ano.
   interface DiaAcc { ano: number; mes: number; dia: number; kwh: number; pico: number; soma: number[]; cnt: number[]; }
@@ -208,6 +236,14 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     const am = `${t.ano}-${t.mes}`;
     const mapa = ehPonta ? pAM : fAM;
     mapa.set(am, (mapa.get(am) || 0) + kwh);
+
+    // Reativa (kVAr) na mesma escala de potência da curva.
+    const qkvar = c.isEnergia ? (t.qInd + t.qCap) / dt : (t.qInd + t.qCap);
+    somaPh[t.hora] += kw; somaQh[t.hora] += qkvar; cntPh[t.hora] += 1;
+    somaQindh[t.hora] += c.isEnergia ? t.qInd / dt : t.qInd;
+    somaQcaph[t.hora] += c.isEnergia ? t.qCap / dt : t.qCap;
+    totP += kw; totQ += qkvar;
+    if (ehPonta) { eaPonta += kw; erPonta += qkvar; } else { eaFora += kw; erFora += qkvar; }
   }
 
   const matriz = soma.map((lin, m) =>
@@ -246,8 +282,26 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     perfil_kw: g.soma.map((s, h) => (g.cnt[h] > 0 ? +(s / g.cnt[h]).toFixed(2) : 0)),
   })).sort((a, b) => a.doy - b.doy);
 
+  // Fator de potência (se o arquivo trouxe colunas de reativa).
+  const fpDe = (ea: number, er: number) => { const s = Math.hypot(ea, er); return s > 0 ? +(ea / s).toFixed(4) : 1; };
+  let fpInfo: FPInfo | undefined;
+  if (temReativa && totQ > 0) {
+    const pPorHora = somaPh.map((s, h) => (cntPh[h] > 0 ? +(s / cntPh[h]).toFixed(2) : 0));
+    const qPorHora = somaQh.map((s, h) => (cntPh[h] > 0 ? +(s / cntPh[h]).toFixed(2) : 0));
+    fpInfo = {
+      pPorHora, qPorHora,
+      fpPorHora: pPorHora.map((p, h) => fpDe(p, qPorHora[h])),
+      capPorHora: somaQcaph.map((cc, h) => cc > somaQindh[h]),
+      medio: fpDe(totP, totQ),
+      ponta: fpDe(eaPonta, erPonta),
+      fora: fpDe(eaFora, erFora),
+      fonte: c.isEnergia ? "consumo (kVArh)" : "demanda (kVAr)",
+    };
+  }
+
   const classif = usaPosto ? "Ponta/Fora-Ponta do arquivo" : "ponta estimada (seg–sex 18h–21h)";
   const tipoVal = c.isEnergia ? "consumo (kWh)" : "demanda (kW)";
+  const avisoFP = fpInfo ? ` FP médio ${fpInfo.medio.toFixed(3)} (ponta ${fpInfo.ponta.toFixed(3)} · fora ${fpInfo.fora.toFixed(3)}).` : "";
   return {
     ok: true, tipo: "distribuidora",
     payload: {
@@ -255,8 +309,9 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
       energia_ponta_kwh: ponta, energia_fp_kwh: fp,
     },
     serieDiaria,
+    fp: fpInfo,
     aviso: `Importado ${tipoVal}: ${resolved.length.toLocaleString("pt-BR")} leituras · `
-      + `intervalo ${Math.round(dt * 60)} min · ${classif}. Matriz 12×24 e energia mensal preenchidas.`,
+      + `intervalo ${Math.round(dt * 60)} min · ${classif}. Matriz 12×24 e energia mensal preenchidas.${avisoFP}`,
   };
 }
 

@@ -1,18 +1,31 @@
 :root {
-  --bg: #0c1219;
-  --panel: #111b27;
-  --acc: #00d4ff;
-  --green: #00e676;
-  --muted: #7aa5c0;
-  --text: #e0eaf4;
+  /* Identidade visual Aurova (aurova-motor-ui.pages.dev) */
+  --bg: #05091a;
+  --panel: #0b1330;
+  --bg-card: #ffffff0a;
+  --acc: #00c8ff;
+  --blue: #005fff;
+  --green: #10b981;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --muted: #94a3b8;
+  --text: #e2e8f0;
+  --border: #005fff33;
+  --rail: #ffffff14;
+  --radius: 10px;
+  --gradient: linear-gradient(135deg, #005fff 0%, #00c8ff 100%);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: system-ui, Arial, sans-serif;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
   background: var(--bg);
+  background-image:
+    linear-gradient(#005fff08 1px, transparent 1px),
+    linear-gradient(90deg, #005fff08 1px, transparent 1px);
+  background-size: 48px 48px;
   color: var(--text);
 }
 
@@ -30,13 +43,14 @@ body {
 
 .card-login {
   background: var(--panel);
+  border: 1px solid var(--border);
   padding: 32px;
   border-radius: 12px;
   width: 320px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), 0 0 24px #005fff20;
 }
 
 .card-login h1 { font-size: 20px; margin: 0; }
@@ -50,7 +64,7 @@ body {
   cursor: pointer;
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-ms { background: #2f6fed; color: #fff; }
+.btn-ms { background: var(--gradient); color: #fff; }
 .btn-google { background: #fff; color: #222; }
 
 .aviso { font-size: 12px; color: #ffab00; }
@@ -77,6 +91,7 @@ body {
   align-items: center;
   padding: 12px 20px;
   background: var(--panel);
+  border-bottom: 1px solid var(--border);
 }
 .perfil { display: flex; align-items: center; gap: 10px; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; }
@@ -100,7 +115,8 @@ body {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   font-size: 13px;
 }
 .chip .dot { width: 9px; height: 9px; border-radius: 50%; }
@@ -144,10 +160,33 @@ body {
 .chip.link:hover { background: #16273a; }
 .chip .seta { margin-left: auto; color: var(--acc); }
 
+/* Abas de análise */
+.abas {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.aba {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.aba:hover { color: var(--text); }
+.aba.ativa { color: var(--acc); border-bottom-color: var(--acc); }
+
 /* Página de módulo */
 .painel {
-  background: var(--panel);
-  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px;
   margin-top: 16px;
 }
@@ -159,7 +198,7 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
-.kpi { background: var(--panel); border-radius: 8px; padding: 12px 14px; }
+.kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
 .kpi-titulo { font-size: 11px; color: var(--muted); }
 .kpi-valor { font-size: 20px; font-weight: 700; margin-top: 4px; }
 
@@ -170,6 +209,13 @@ body {
   border: 1px solid var(--rail, #1e2f42); border-radius: 6px;
   padding: 6px 8px; font-size: 13px; min-width: 320px;
 }
+.campo select {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; min-width: 200px; cursor: pointer;
+}
+.campo select:focus { outline: 1px solid var(--acc); }
+.campo select option { background: var(--panel); color: var(--text); }
 
 .colagem { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; }
 .colagem textarea {

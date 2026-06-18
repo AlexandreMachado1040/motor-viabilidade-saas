@@ -6,9 +6,20 @@ import {
 import { interpretar, lerPlanilha } from "./loadUpload";
 import { DemandaDiariaChart } from "./DemandaDiariaChart";
 import { EnergiaMensalChart } from "./EnergiaMensalChart";
+import { AbaFatores, AbaPQS } from "./AnaliseTabs";
+import { curvaTipica } from "./loadAnalise";
 import { BASES_CTR, carregarCampanha, listarDistribuidoras, listarOpcoes } from "./campanhaAneel";
 import type { BaseId } from "./campanhaAneel";
-import type { DiaDemanda } from "../../types";
+import type { DiaDemanda, FPInfo } from "../../types";
+
+type Aba = "curva" | "pqs" | "fatores";
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: "curva", rotulo: "📈 Curva de Carga" },
+  { id: "pqs", rotulo: "⚡ P · Q · S" },
+  { id: "fatores", rotulo: "📊 Fatores" },
+];
+
+const SUPORTE_EMAIL = "suporte@aurova.com.br";
 
 export function LoadPage() {
   const [matriz, setMatriz] = useState<number[][]>(matrizZerada);
@@ -20,6 +31,13 @@ export function LoadPage() {
   const [avisoUpload, setAvisoUpload] = useState<string | null>(null);
   const [serieUpload, setSerieUpload] = useState<DiaDemanda[] | null>(null);
   const [fonteSerie, setFonteSerie] = useState<string | null>(null);
+  const [fpReal, setFpReal] = useState<FPInfo | null>(null);
+  const [suporteFalha, setSuporteFalha] = useState<{ arquivo: string; motivo: string } | null>(null);
+
+  // Abas de análise + controles.
+  const [aba, setAba] = useState<Aba>("curva");
+  const [fatorPot, setFatorPot] = useState(0.92);
+  const [dInst, setDInst] = useState<number | null>(null);
 
   // Campanha de Medição (curva-tipo ANEEL/CTR).
   const [campAberta, setCampAberta] = useState(false);
@@ -41,6 +59,10 @@ export function LoadPage() {
     ? (fonteSerie ?? "memória de massa")
     : "perfil mensal replicado (representativo — sem leituras brutas)";
 
+  // Curva típica 24h (kW) e energia mensal, para as abas de análise.
+  const curva24 = useMemo(() => curvaTipica(serieGrafico), [serieGrafico]);
+  const mensal = useMemo(() => ponta.map((p, i) => p + (fp[i] ?? 0)), [ponta, fp]);
+
   // ── Derivados locais (preview imediato) ──────────────────────────────────
   const local = useMemo(() => {
     const picoGeral = Math.max(0, ...matriz.map((linha) => Math.max(0, ...linha)));
@@ -54,12 +76,14 @@ export function LoadPage() {
   const importarArquivo = async (file: File) => {
     setErro(null);
     setAvisoUpload(null);
+    setSuporteFalha(null);
     setCarregando(true);
     try {
       const rows = await lerPlanilha(file);
       const r = interpretar(rows);
       if (!r.ok || !r.payload) {
-        setErro(r.aviso);
+        // Analisou mas não reconheceu a estrutura → orienta enviar ao suporte.
+        setSuporteFalha({ arquivo: file.name, motivo: r.aviso });
         return;
       }
       setMatriz(r.payload.demanda_kw);
@@ -68,9 +92,13 @@ export function LoadPage() {
       setDemandaManual(r.payload.demanda_maxima_kw);
       setSerieUpload(r.serieDiaria && r.serieDiaria.length > 0 ? r.serieDiaria : null);
       setFonteSerie("memória de massa (arquivo)");
+      setFpReal(r.fp ?? null);
       setAvisoUpload(r.aviso);
     } catch {
-      setErro("Falha ao ler o arquivo. Verifique o formato/codificação.");
+      setSuporteFalha({
+        arquivo: file.name,
+        motivo: "Não foi possível ler o arquivo (formato/codificação não suportados).",
+      });
     } finally {
       setCarregando(false);
     }
@@ -132,6 +160,7 @@ export function LoadPage() {
       setDemandaManual(res.payload.demanda_maxima_kw);
       setSerieUpload(res.serieDiaria);
       setFonteSerie(`Campanha ANEEL · ${res.meta.base} · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
+      setFpReal(null);
       setAvisoUpload(
         `Campanha de Medição aplicada — ANEEL/CTR · ${res.meta.base} · ${res.meta.sig} / ${res.meta.sbg} · `
         + `${res.meta.demandante} · processo ${res.meta.ano} (${res.meta.processo}). `
@@ -151,7 +180,9 @@ export function LoadPage() {
     setDemandaManual(null);
     setSerieUpload(null);
     setFonteSerie(null);
+    setFpReal(null);
     setAvisoUpload(null);
+    setSuporteFalha(null);
     // Fecha e reseta o quadro da Campanha de Medição.
     setCampAberta(false);
     setDistribuidoras([]);
@@ -192,6 +223,32 @@ export function LoadPage() {
       <main>
         {erro && <p className="aviso">{erro}</p>}
         {avisoUpload && <div className="resultado ok">{avisoUpload}</div>}
+
+        {/* Falha ao estruturar o upload → orienta enviar ao suporte Aurova */}
+        {suporteFalha && (
+          <div className="resultado falha">
+            <strong>Não consegui estruturar o arquivo “{suporteFalha.arquivo}”.</strong>
+            <p style={{ margin: "6px 0" }}>{suporteFalha.motivo}</p>
+            <p style={{ margin: "6px 0", fontSize: 12, color: "var(--muted)" }}>
+              Formatos aceitos: export de <b>demanda/consumo</b> (coluna Data + kW/kWh; colunas de kVAr/kVArh
+              habilitam o Fator de Potência) ou <b>grade 12×24</b>. Arquivos CSV, TSV ou Excel (.xlsx/.xls).
+            </p>
+            <p style={{ margin: "6px 0" }}>
+              Se o seu arquivo segue outro layout, envie-o para o time montar o template:
+            </p>
+            <a
+              className="btn btn-ms btn-sm"
+              href={`mailto:${SUPORTE_EMAIL}?subject=${encodeURIComponent(
+                `[Memória de Massa] Novo template — ${suporteFalha.arquivo}`,
+              )}&body=${encodeURIComponent(
+                `Olá, suporte Aurova.\n\nNão consegui importar a memória de massa no MOD 1 (Input de Carga).\nArquivo: ${suporteFalha.arquivo}\nMotivo detectado: ${suporteFalha.motivo}\n\nSegue o arquivo em anexo para mapeamento do template.\n\nObrigado.`,
+              )}`}
+              style={{ display: "inline-block", textDecoration: "none" }}
+            >
+              ✉ Enviar ao suporte Aurova ({SUPORTE_EMAIL})
+            </a>
+          </div>
+        )}
 
         {/* Campanha de Medição — seletor da curva-tipo ANEEL/CTR */}
         {campAberta && (
@@ -239,19 +296,40 @@ export function LoadPage() {
           </section>
         )}
 
-        {/* KPIs */}
-        <div className="grid-kpis">
-          <Kpi titulo="Demanda máxima" valor={`${fmt(local.demandaMaxima, 2)} kW`} />
-          <Kpi titulo="Energia ponta (ano)" valor={`${fmt(local.pontaTotal)} kWh`} />
-          <Kpi titulo="Energia fora-ponta (ano)" valor={`${fmt(local.fpTotal)} kWh`} />
-          <Kpi titulo="Energia total (ano)" valor={`${fmt(local.pontaTotal + local.fpTotal)} kWh`} />
+        {/* Barra de abas */}
+        <div className="abas">
+          {ABAS.map((a) => (
+            <button key={a.id} className={`aba ${aba === a.id ? "ativa" : ""}`} onClick={() => setAba(a.id)}>
+              {a.rotulo}
+            </button>
+          ))}
         </div>
 
-        {/* Energia mensal — gráfico empilhado (Ponta + Fora-ponta) */}
-        <EnergiaMensalChart ponta={ponta} fp={fp} />
+        {/* ── Aba: Curva de Carga ── */}
+        {aba === "curva" && (
+          <>
+            <div className="grid-kpis">
+              <Kpi titulo="Demanda máxima" valor={`${fmt(local.demandaMaxima, 2)} kW`} />
+              <Kpi titulo="Energia ponta (ano)" valor={`${fmt(local.pontaTotal)} kWh`} />
+              <Kpi titulo="Energia fora-ponta (ano)" valor={`${fmt(local.fpTotal)} kWh`} />
+              <Kpi titulo="Energia total (ano)" valor={`${fmt(local.pontaTotal + local.fpTotal)} kWh`} />
+              {fpReal && (
+                <Kpi titulo="FP médio (medido)"
+                  valor={`${fmt(fpReal.medio, 4)}${fpReal.medio < 0.92 ? " ⚠" : ""}`} />
+              )}
+            </div>
+            <EnergiaMensalChart ponta={ponta} fp={fp} />
+            <DemandaDiariaChart serie={serieGrafico} fonte={fonteGrafico} />
+          </>
+        )}
 
-        {/* Análise diária ao longo do ano (sem recurso de API — client-side) */}
-        <DemandaDiariaChart serie={serieGrafico} fonte={fonteGrafico} />
+        {/* ── Aba: P · Q · S ── */}
+        {aba === "pqs" && <AbaPQS curva24={curva24} fp={fatorPot} setFp={setFatorPot} fpReal={fpReal} />}
+
+        {/* ── Aba: Fatores ── */}
+        {aba === "fatores" && (
+          <AbaFatores curva24={curva24} mensal={mensal} dInst={dInst} setDInst={setDInst} />
+        )}
       </main>
     </div>
   );
