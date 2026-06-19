@@ -5,13 +5,13 @@ from pydantic import BaseModel, Field
 
 
 class InputLoadPayload(BaseModel):
-    """Memória de massa: demanda 12×24 + energia mensal ponta/fora-ponta."""
+    """Memória de massa: demanda mensal/horária + energia mensal ponta/fora-ponta."""
     demanda_maxima_kw: float | None = Field(
         default=None,
-        description="Se ausente, é detectada como o pico da matriz de demanda.",
+        description="Se ausente, é detectada como o pico da demanda.",
     )
     demanda_kw: list[list[float]] = Field(
-        default_factory=list, description="12 meses × 24 horas (kW)."
+        default_factory=list, description="Demanda por mês e hora (kW)."
     )
     energia_ponta_kwh: list[float] = Field(default_factory=list, description="12 meses.")
     energia_fp_kwh: list[float] = Field(default_factory=list, description="12 meses.")

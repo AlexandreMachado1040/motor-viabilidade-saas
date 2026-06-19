@@ -23,27 +23,6 @@ export function parseNumeroBR(token: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/**
- * Converte texto colado de planilha (12 linhas × 24 colunas) em matriz.
- * Aceita separação por tab, ponto e vírgula ou espaços; decimal pt-BR.
- */
-export function parseMatrizColada(texto: string): number[][] {
-  const linhas = texto
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-
-  const matriz = matrizZerada();
-  linhas.slice(0, 12).forEach((linha, i) => {
-    let celulas = linha.split(/[\t;]/);
-    if (celulas.length < 2) celulas = linha.split(/\s+/);
-    celulas.slice(0, 24).forEach((c, j) => {
-      matriz[i][j] = parseNumeroBR(c);
-    });
-  });
-  return matriz;
-}
-
 export const fmt = (v: number, dec = 0): string =>
   v.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
@@ -61,8 +40,8 @@ export function diaDoAno(mes: number, dia: number): number {
 export const INICIO_MES = MESES.map((_, i) => diaDoAno(i + 1, 1));
 
 /**
- * Gera uma série diária representativa a partir da matriz 12×24: cada dia do
- * mês recebe o perfil médio daquele mês. Usado quando não há leituras brutas
+ * Gera uma série diária representativa a partir da demanda mensal/horária: cada
+ * dia do mês recebe o perfil médio daquele mês. Usado quando não há leituras brutas
  * (exemplo/demo, ou entrada manual) — apenas para visualização.
  */
 export function serieDiariaDeMatriz(matriz: number[][]): import("../../types").DiaDemanda[] {

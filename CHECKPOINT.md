@@ -42,8 +42,8 @@ yuriNEW/
 | Migrações Alembic | ✅ | `408afe7b86be` (schema) + `09020a684b4f` (is_admin) |
 | Frontend (login, callback, dashboard, admin) | ✅ | `npm run build` (tsc strict) verde |
 | Testes Vitest | ✅ | 10/10 (`ProtectedRoute` + token store) |
-| **MOD 1 InputLoad — backend** (`/modulos/load/*`) | ✅ | guard 403 sem licença; exemplo 12×24; validar totais/erros |
-| **MOD 1 InputLoad — front privado** (`/modulos/load`) | ✅ | grid 12×24 + colagem TSV pt-BR; KPIs; validação no servidor |
+| **MOD 1 InputLoad — backend** (`/modulos/load/*`) | ✅ | guard 403 sem licença; exemplo de demanda mensal/horária; validar totais/erros |
+| **MOD 1 InputLoad — front privado** (`/modulos/load`) | ✅ | Memória de Massa (upload) + Campanha ANEEL; gráficos SVG; KPIs |
 
 ## Decisões de arquitetura
 
@@ -79,7 +79,7 @@ yuriNEW/
   `require_module("load")`. Chip "load" do dashboard navega quando licenciado.
 - Frontend `pages/modulos/LoadPage.tsx` (rota privada `/modulos/load`) — tela só de
   visualização, entrada por **Memória de Massa** (upload) e **Campanha de Medição**.
-  Removidos: tabela 12×24, tabela de energia, demanda manual, colagem, botão "Validar".
+  Removidos: as tabelas de demanda e energia, demanda manual, colagem, botão "Validar".
 
 ### Gráficos (SVG próprio, sem lib) — identidade `aurova-motor-ui.pages.dev`
 Paleta/tema em `pages/modulos/chartTheme.ts` (fundo azul translúcido, clean):
@@ -91,8 +91,8 @@ Paleta/tema em `pages/modulos/chartTheme.ts` (fundo azul translúcido, clean):
 
 ### Upload de memória de massa (`loadUpload.ts`)
 Auto-detecta export de distribuidora (Latin-1, `;`, decimal vírgula, coluna "Postos
-horários" → Ponta/FP), grade 12×24 ou fallback. CSV/TSV + Excel (SheetJS). Gera
-matriz 12×24 + energia mensal + **série diária** dos gráficos. Validado com arquivo
+horários" → Ponta/FP). CSV/TSV + Excel (SheetJS). Gera demanda mensal/horária
++ energia mensal + **série diária** dos gráficos. Validado com arquivo
 real (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
 
 ### Abas de análise (`AnaliseTabs.tsx` + `loadAnalise.ts`) — 18/06
@@ -114,7 +114,7 @@ bases: **Rede Tipo** (rid `a77cacce-…`, subgrupo `NomSbgDes`) e **Consumidor T
 (rid `b0418edb-…`, subgrupo `NomSubGrupoTarifario`). Seletor em cascata dinâmico
 (Base → Distribuidora → Subgrupo → Rede/Consumidor tipo). Baixa as 3 curvas
 (Útil/Sáb/Dom, 96 blocos de 15 min, pinando ano+processo mais recente), agrega em
-24 h e expande num ano representativo (2025) → matriz 12×24 + energia mensal Ponta/FP
+24 h e expande num ano representativo (2025) → demanda mensal/horária + energia mensal Ponta/FP
 + série diária. A ANEEL **não envia CORS** → proxy same-origin `/aneel`:
 `server.proxy` do Vite (`vite.config.ts`, dev) + **Cloudflare Pages Function**
 `frontend/functions/aneel/[[path]].js` (demo). Em produção c/ login, rotear por

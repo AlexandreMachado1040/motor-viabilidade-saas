@@ -27,7 +27,7 @@ export function EnergiaMensalChart({ ponta, fp }: Props) {
   const y = (v: number) => MT + PH - (v / yMax) * PH;
   const ticks = Array.from({ length: 5 }, (_, i) => (yMax / 4) * i);
   const band = PW / 12;
-  const bw = band * 0.42; // 30% mais fina que o padrão anterior (0,6)
+  const bw = band * 0.20; // espessura idêntica ao Aurova (barra 26 / banda ~130 ≈ 0,20)
   const cx = (i: number) => ML + band * (i + 0.5);
   const sel = hover;
 
@@ -69,9 +69,9 @@ export function EnergiaMensalChart({ ponta, fp }: Props) {
               <g key={mes} onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }}>
                 <rect x={cx(i) - band / 2} y={MT} width={band} height={PH} fill="transparent" />
                 <rect x={cx(i) - bw / 2} y={fpTop} width={bw} height={Math.max(0, baseY - fpTop)}
-                  fill={C.foraPonta} opacity={op} rx={1.5} />
+                  fill={C.foraPonta} opacity={op} />
                 <rect x={cx(i) - bw / 2} y={pontaTop} width={bw} height={Math.max(0, fpTop - pontaTop)}
-                  fill={C.ponta} opacity={op} rx={1.5} />
+                  fill={C.ponta} opacity={op} rx={2} />
                 <text x={cx(i)} y={MT + PH + 18} textAnchor="middle" fontSize={12} fill={C.txt}>{mes}</text>
               </g>
             );

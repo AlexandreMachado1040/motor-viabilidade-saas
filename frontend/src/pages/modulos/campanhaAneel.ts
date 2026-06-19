@@ -105,7 +105,7 @@ function tipoDoDia(weekday: number): TipoDia {
   return "Dia Útil";
 }
 
-/** Carrega a campanha de medição e monta o InputLoad (matriz 12×24 + energia + série diária). */
+/** Carrega a campanha de medição e monta o InputLoad (demanda mensal/horária + energia + série diária). */
 export async function carregarCampanha(baseId: BaseId, sig: string, sbg: string, dem: string): Promise<CampanhaResultado> {
   const b = baseDe(baseId);
   const { ano, processo } = await escolherProcesso(b, sig, sbg, dem);

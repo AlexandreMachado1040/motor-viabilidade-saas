@@ -196,7 +196,7 @@ export function LoadPage() {
       <header className="topbar">
         <div>
           <strong>MOD 1 · Input de Carga</strong>
-          <span className="muted"> · memória de massa (demanda 12×24 + energia)</span>
+          <span className="muted"> · memória de massa (demanda mensal/horária + energia)</span>
         </div>
         <div className="perfil">
           <label className="btn btn-google btn-sm" style={{ cursor: "pointer", margin: 0 }}>
@@ -231,7 +231,7 @@ export function LoadPage() {
             <p style={{ margin: "6px 0" }}>{suporteFalha.motivo}</p>
             <p style={{ margin: "6px 0", fontSize: 12, color: "var(--muted)" }}>
               Formatos aceitos: export de <b>demanda/consumo</b> (coluna Data + kW/kWh; colunas de kVAr/kVArh
-              habilitam o Fator de Potência) ou <b>grade 12×24</b>. Arquivos CSV, TSV ou Excel (.xlsx/.xls).
+              habilitam o Fator de Potência). Arquivos CSV, TSV ou Excel (.xlsx/.xls).
             </p>
             <p style={{ margin: "6px 0" }}>
               Se o seu arquivo segue outro layout, envie-o para o time montar o template:

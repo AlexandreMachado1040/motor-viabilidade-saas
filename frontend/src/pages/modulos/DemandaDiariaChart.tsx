@@ -69,8 +69,29 @@ export function DemandaDiariaChart({ serie, fonte }: Props) {
     <section className="painel">
       <GraficoDiario serie={serie} fonte={fonte} sel={sel} hover={hover} stats={stats}
         onMover={diaMaisProximo} onSair={() => setHover(null)} onClicar={aoClicar} />
+      <SeletorDia serie={serie} sel={sel} onSel={setFixo} />
       <PerfilHorario dia={serie[sel]} fixo={fixo != null} />
     </section>
+  );
+}
+
+// ── Slider de seleção de dia (entre os dois gráficos, como no Aurova) ────────
+function SeletorDia({ serie, sel, onSel }: { serie: DiaDemanda[]; sel: number; onSel: (i: number) => void }) {
+  const dia = serie[sel];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 2px 6px", flexWrap: "wrap" }}>
+      <span style={{ fontSize: "0.82rem", color: C.muted }}>
+        Dia: <strong style={{ color: C.cursor }}>{dataBR(dia)}</strong>
+      </span>
+      <input
+        type="range" min={0} max={serie.length - 1} value={sel}
+        onChange={(e) => onSel(Number(e.target.value))}
+        style={{ flex: "1 1 0", minWidth: 160, accentColor: C.cursor }}
+      />
+      <span style={{ fontSize: "0.8rem", color: C.muted }}>
+        Total: <strong>{fmt(dia.total_kwh)} kWh</strong> · Pico: <strong>{fmt(dia.pico_kw, 1)} kW</strong>
+      </span>
+    </div>
   );
 }
 
@@ -110,13 +131,13 @@ function GraficoDiario({
         <svg ref={ref} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
           onMouseMove={(e) => onMover(e, ref.current)} onMouseLeave={onSair} onClick={onClicar}>
           <defs>
-            <linearGradient id="grad-d" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="dailyFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={C.area0} /><stop offset="100%" stopColor={C.area1} />
             </linearGradient>
           </defs>
           <EixoMeses H={H} />
           <EixoY H={H} yMax={yMax} ticks={ticks} unidade="kWh" />
-          <path d={area} fill="url(#grad-d)" />
+          <path d={area} fill="url(#dailyFill)" />
           <path d={linha} fill="none" stroke={C.linha} strokeWidth={2.2} strokeLinejoin="round" />
           {/* Média (âmbar) */}
           <line x1={ML} y1={y(media)} x2={ML + PW} y2={y(media)} stroke={C.media} strokeWidth={1.6} strokeDasharray="7 5" />
@@ -160,18 +181,19 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
   };
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <h3>Perfil horário — {dataBR(dia)}</h3>
-      <p className="muted" style={{ marginTop: -6 }}>
-        Dia: {dataBR(dia)} · Total: {fmt(dia.total_kwh)} kWh · Pico: {fmt(dia.pico_kw, 1)} kW
-        {fixo ? " · fixado (clique no gráfico de cima p/ soltar)" : " · passe o mouse no gráfico de cima"}
-      </p>
+    <div style={{ marginTop: 4 }}>
+      <h3>Perfil horário — {dataBR(dia)}
+        <span className="muted" style={{ fontWeight: 400, fontSize: "0.8rem" }}>
+          {fixo ? "  · fixado (clique no gráfico de cima p/ soltar)" : "  · passe o mouse no gráfico de cima ou use o slider"}
+        </span>
+      </h3>
       <div style={{ background: C.painel, borderRadius: 10, padding: "8px 4px" }}>
         <svg ref={ref} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
           onMouseMove={aoMover} onMouseLeave={() => setHH(null)}>
           <defs>
-            <linearGradient id="grad-h" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={C.area0} /><stop offset="100%" stopColor={C.area1} />
+            <linearGradient id="dayHourFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00C8FF" stopOpacity={0.5} />
+              <stop offset="100%" stopColor="#005FFF" stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <EixoY H={H} yMax={yMax} ticks={ticks} unidade="kW" />
@@ -182,8 +204,8 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
               {h % 2 === 1 && <text x={xh(h)} y={MT + PH + 18} textAnchor="middle" fontSize={11} fill={C.txt}>{h}h</text>}
             </g>
           ))}
-          <path d={area} fill="url(#grad-h)" />
-          <path d={linha} fill="none" stroke={C.linha} strokeWidth={2.2} strokeLinejoin="round" />
+          <path d={area} fill="url(#dayHourFill)" />
+          <path d={linha} fill="none" stroke={C.cursor} strokeWidth={2.2} strokeLinejoin="round" />
           {hh != null && (
             <>
               <line x1={xh(hh)} y1={MT} x2={xh(hh)} y2={MT + PH} stroke={C.cursor} strokeWidth={1.2} />

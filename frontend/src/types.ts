@@ -36,7 +36,7 @@ export interface TokenResponse {
 // ── MOD 1 — InputLoad ────────────────────────────────────────────────────────
 export interface InputLoadPayload {
   demanda_maxima_kw: number | null;
-  demanda_kw: number[][]; // 12 × 24
+  demanda_kw: number[][]; // [mês][hora] em kW
   energia_ponta_kwh: number[]; // 12
   energia_fp_kwh: number[]; // 12
 }

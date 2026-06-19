@@ -4,7 +4,7 @@ import { diaDoAno } from "./loadUtils";
 
 export interface ResultadoUpload {
   ok: boolean;
-  tipo: "distribuidora" | "grade" | "desconhecido";
+  tipo: "distribuidora" | "desconhecido";
   payload?: InputLoadPayload;
   serieDiaria?: DiaDemanda[];
   fp?: FPInfo;
@@ -129,22 +129,9 @@ export function interpretar(rows: string[][]): ResultadoUpload {
     }
   }
 
-  const grade = tentarGrade(rows);
-  if (grade) {
-    const pico = grade.map((l) => Math.max(0, ...l));
-    return {
-      ok: true, tipo: "grade",
-      payload: {
-        demanda_maxima_kw: Math.max(0, ...pico), demanda_kw: grade,
-        energia_ponta_kwh: Array(12).fill(0), energia_fp_kwh: Array(12).fill(0),
-      },
-      aviso: "Grade 12×24 detectada e carregada. Energia mensal não consta no arquivo — preencha à parte.",
-    };
-  }
-
   return {
     ok: false, tipo: "desconhecido",
-    aviso: "Formato não reconhecido. Esperado: export de demanda/consumo (coluna Data + kW/kWh) ou grade 12×24.",
+    aviso: "Formato não reconhecido. Esperado: export de demanda/consumo (coluna Data + kW/kWh).",
   };
 }
 
@@ -311,14 +298,7 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     serieDiaria,
     fp: fpInfo,
     aviso: `Importado ${tipoVal}: ${resolved.length.toLocaleString("pt-BR")} leituras · `
-      + `intervalo ${Math.round(dt * 60)} min · ${classif}. Matriz 12×24 e energia mensal preenchidas.${avisoFP}`,
+      + `intervalo ${Math.round(dt * 60)} min · ${classif}. Demanda mensal/horária e energia mensal preenchidas.${avisoFP}`,
   };
 }
 
-function tentarGrade(rows: string[][]): number[][] | null {
-  const cand = rows
-    .map((r) => r.map(celulaNumero).filter((n): n is number => n != null))
-    .filter((nums) => nums.length >= 24);
-  if (cand.length >= 12) return cand.slice(0, 12).map((nums) => nums.slice(0, 24));
-  return null;
-}
