@@ -1,6 +1,6 @@
 # CHECKPOINT — Motor de Viabilidade (SaaS modular)
 
-> Última atualização: 17/06/2026 · Ponto de retomada do trabalho.
+> Última atualização: 19/06/2026 · Ponto de retomada do trabalho.
 
 ## Visão geral
 
@@ -95,10 +95,31 @@ horários" → Ponta/FP). CSV/TSV + Excel (SheetJS). Gera demanda mensal/horári
 + energia mensal + **série diária** dos gráficos. Validado com arquivo
 real (35.136 leituras / 15 min). Dados de cliente em `.docs/massa/` (gitignored).
 
-### Abas de análise (`AnaliseTabs.tsx` + `loadAnalise.ts`) — 18/06
-Tela do MOD 1 em abas: **Curva de Carga** (KPIs + 3 gráficos) · **P·Q·S** · **Fatores**.
-Gráficos SVG próprios com crosshair/tooltip. Identidade visual Aurova aplicada ao
-projeto inteiro (`styles.css`). LDC/Curva de Duração foi retirada do escopo.
+### Abas de análise (`AnaliseTabs.tsx` + `loadAnalise.ts`) — atualizado 19/06
+Tela do MOD 1 em abas: **Curva de Carga** (KPIs + Energia mensal + Análise diária)
+· **P·Q·S**. A aba **Fatores foi OCULTADA** (entrada comentada em `ABAS` no
+`LoadPage.tsx`; `AbaFatores` permanece no código — reativar = descomentar).
+Gráficos SVG próprios com crosshair/tooltip, identidade Aurova (`styles.css`).
+LDC/Curva de Duração fora do escopo.
+
+### Reformulação da aba P·Q·S — 19/06
+- **Análise diária da demanda** com as 3 linhas **P/Q/S** plotadas: P verde (área),
+  Q âmbar tracejada (`Q=P·tanφ`), S ciano (`S=P/FP`); eixo reescalado a S; legenda
+  e tooltip com swatch de cor. Tooltips de hora no formato `HH:00 - HH:59`.
+- **cosφ diário** (`CosphiDiarioChart` em `DemandaDiariaChart.tsx`): visão anual +
+  slider + perfil horário do cosφ do dia; estimado por carga baixa
+  `cosφ(h) ≈ FP·(P/Dmáx)^0,12` (Starosta/OSE), limite ANEEL 0,92.
+- **Bloco de controle/alertas de FP** (badge do FP real medido OU slider).
+- **Timeline compartilhada:** seleção de dia é estado único na `AbaPQS`; hover/slider
+  em qualquer gráfico move cursor+perfil de todos. `DemandaDiariaChart` e
+  `CosphiDiarioChart` têm modo controlado (`selIndex`/`onHoverIndex`/`onPinIndex`).
+- **Removidos da aba:** Triângulo P·Q·S por hora, FP por hora, Tabela horária — e o
+  código órfão (`GraficoLinhas`, `TipLinhas`, `Legenda`, `horasTicks`, `TabelaSimples`).
+- Termo **"grade 12×24" removido** do domínio de carga (caminho `tentarGrade`, parser
+  de colagem, textos); matriz interna `demanda_kw` mantida; matriz 12×24 SOLAR intacta.
+
+> ⚠️ **Pendente de commit/deploy:** todo este bloco 18–19/06 ainda NÃO foi commitado.
+> Último deploy Cloudflare = commit `3eb1da6`. GitHub atrás (auth `gh` quebrada).
 
 ### Fator de Potência da memória de massa — 18/06
 `loadUpload.ts` lê as colunas de reativa (kVAr/kVArh indutivo/capacitivo) e calcula
@@ -135,9 +156,13 @@ endpoint autenticado no backend.
 - Frontend: `cd frontend && npm run dev` (porta 5173). DEV_LOGIN_ENABLED=true →
   caixa "Entrar (dev)" na tela de login.
 
-## PRÓXIMO PASSO (retomar aqui) — Front do MOD 2 `InputGrid`
+## PRÓXIMO PASSO (retomar aqui)
 
-Tarifas/encargos da distribuidora (+ API ANEEL). Mesmo padrão privado:
+**0. Fechar o trabalho 18–19/06:** commitar tudo, redeployar no Cloudflare e enviar
+ao GitHub assim que a auth do `gh` (keyring) for resolvida com token escopo `repo`.
+
+**1. Front do MOD 2 `InputGrid`** — tarifas/encargos da distribuidora (+ API ANEEL),
+mesmo padrão privado:
 1. Backend `app/modulos/grid/` (`require_module("grid")`): endpoints para validar
    tarifas e (opcional) buscar via `ClienteAPIANEEL`.
 2. Frontend `pages/modulos/GridPage.tsx`, rota privada `/modulos/grid`; registrar
@@ -145,3 +170,12 @@ Tarifas/encargos da distribuidora (+ API ANEEL). Mesmo padrão privado:
 
 Padrão reutilizável já estabelecido pelo MOD 1 (integracao/motor.py, schemas,
 service, router com guard; página com KPIs + validação no servidor).
+
+**Spec funcional do MOD 2 (já analisada):** planilha oficial
+`.docs/SIMULADOR TARIFAS ANUAL_V1.xls` (Cartilha "Como Analisar Gastos com Energia
+Elétrica"). Lógica: compara o custo anual nos enquadramentos **Convencional · Azul ·
+Verde · Baixa Tensão** e recomenda o mais barato; **sugere a demanda a contratar**;
+sazonalidade **seco (mai–nov) / úmido (dez–abr)**; **ultrapassagem = 2× a tarifa de
+demanda**; demanda faturável = max(medida, contratada). Alimentar com a Memória de
+Massa do MOD 1 (P1+P4). ⚠️ Implementar com a **tolerância de 5%** da REN 1.000/2021
+(a planilha, de ~2016, não a aplica).

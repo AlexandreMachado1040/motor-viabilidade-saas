@@ -16,7 +16,8 @@ type Aba = "curva" | "pqs" | "fatores";
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: "curva", rotulo: "📈 Curva de Carga" },
   { id: "pqs", rotulo: "⚡ P · Q · S" },
-  { id: "fatores", rotulo: "📊 Fatores" },
+  // Aba "Fatores" ocultada por ora (não necessária neste momento) — reativar
+  // adicionando { id: "fatores", rotulo: "📊 Fatores" } de volta.
 ];
 
 const SUPORTE_EMAIL = "suporte@aurova.com.br";
