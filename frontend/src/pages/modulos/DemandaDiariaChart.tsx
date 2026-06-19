@@ -231,7 +231,10 @@ function PerfilHorario({ dia }: { dia: DiaDemanda }) {
               <line x1={xh(hh)} y1={PMT} x2={xh(hh)} y2={base} stroke={C.cursor} strokeWidth={1.2} />
               <circle cx={xh(hh)} cy={y(dia.perfil_kw[hh])} r={3.5} fill={C.cursor} stroke={C.bg} strokeWidth={1.5} />
               <Tip x={xh(hh)} y={y(dia.perfil_kw[hh])} H={H}
-                linhas={[`${hh}h–${hh + 1}h`, `${fmt(dia.perfil_kw[hh], 1)} kW`]} />
+                linhas={[
+                  `${String(hh).padStart(2, "0")}:00 - ${String(hh).padStart(2, "0")}:59`,
+                  `Demanda : ${fmt(dia.perfil_kw[hh], 2)} kW`,
+                ]} />
             </>
           )}
 
