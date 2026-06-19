@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from "react";
-import type { FPInfo } from "../../types";
+import type { DiaDemanda, FPInfo } from "../../types";
 import { fmt, MESES } from "./loadUtils";
 import { C, niceCeil } from "./chartTheme";
 import { ALFA_FP, indicadores, pqsPorHora } from "./loadAnalise";
+import { DemandaDiariaChart } from "./DemandaDiariaChart";
 
 const W = 980, ML = 58, MR = 20, MT = 20, MB = 44, PW = W - ML - MR;
+const GRID_REF = "rgba(255,255,255,0.06)"; // grade tracejada translúcida (Aurova)
+const EIXO_REF = "#666";                    // linhas/rótulos de eixo (Aurova)
 
 interface XTick { i: number; label: string; }
 interface Serie { nome: string; cor: string; dados: number[]; tracejado?: boolean; area?: boolean; }
@@ -34,16 +37,26 @@ function GraficoLinhas({ H, series, xTicks, yMin = 0, yMax, unidade, decTick = 0
     <div style={{ background: C.painel, borderRadius: 10, padding: "8px 4px" }}>
       <svg ref={ref} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
         onMouseMove={aoMover} onMouseLeave={() => setHi(null)}>
+        {/* Grade horizontal + rótulos/tick do eixo Y */}
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={ML} y1={y(t)} x2={ML + PW} y2={y(t)} stroke={C.grid} strokeWidth={1} strokeDasharray="1 4" />
-            <text x={ML - 8} y={y(t) - 1} textAnchor="end" fontSize={11} fill={C.txt}>{fmt(t, decTick)}</text>
+            <line x1={ML} y1={y(t)} x2={ML + PW} y2={y(t)} stroke={GRID_REF} strokeWidth={1} strokeDasharray="3 3" />
+            <line x1={ML - 6} y1={y(t)} x2={ML} y2={y(t)} stroke={EIXO_REF} strokeWidth={1} />
+            <text x={ML - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill={EIXO_REF}>{fmt(t, decTick)}</text>
           </g>
         ))}
-        <text x={ML - 8} y={MT - 4} textAnchor="end" fontSize={9} fill={C.muted}>{unidade}</text>
+        <text x={ML - 8} y={MT - 6} textAnchor="end" fontSize={9} fill={C.muted}>{unidade}</text>
+        {/* Grade vertical + rótulos/tick do eixo X */}
         {xTicks.map((xt) => (
-          <text key={xt.i} x={x(xt.i)} y={MT + PH + 16} textAnchor="middle" fontSize={10} fill={C.txt}>{xt.label}</text>
+          <g key={xt.i}>
+            <line x1={x(xt.i)} y1={MT} x2={x(xt.i)} y2={MT + PH} stroke={GRID_REF} strokeWidth={1} strokeDasharray="3 3" />
+            <line x1={x(xt.i)} y1={MT + PH} x2={x(xt.i)} y2={MT + PH + 6} stroke={EIXO_REF} strokeWidth={1} />
+            <text x={x(xt.i)} y={MT + PH + 18} textAnchor="middle" fontSize={11} fill={EIXO_REF}>{xt.label}</text>
+          </g>
         ))}
+        {/* Eixos sólidos */}
+        <line x1={ML} y1={MT + PH} x2={ML + PW} y2={MT + PH} stroke={EIXO_REF} strokeWidth={1} />
+        <line x1={ML} y1={MT} x2={ML} y2={MT + PH} stroke={EIXO_REF} strokeWidth={1} />
         {series.map((s) => {
           const d = "M" + s.dados.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" L");
           return (
@@ -138,8 +151,9 @@ const horasTicks: XTick[] = Array.from({ length: 24 }, (_, h) => h).filter((h) =
 // ════════════════════════════════════════════════════════════════════════════
 // ABA P · Q · S
 // ════════════════════════════════════════════════════════════════════════════
-export function AbaPQS({ curva24, fp, setFp, fpReal }: {
+export function AbaPQS({ curva24, fp, setFp, fpReal, serie, fonte }: {
   curva24: number[]; fp: number; setFp: (v: number) => void; fpReal?: FPInfo | null;
+  serie: DiaDemanda[]; fonte: string;
 }) {
   const real = fpReal ?? null;
 
@@ -164,6 +178,8 @@ export function AbaPQS({ curva24, fp, setFp, fpReal }: {
 
   return (
     <>
+      <DemandaDiariaChart serie={serie} fonte={fonte} />
+
       <section className="painel">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <h3 style={{ margin: 0 }}>Triângulo de potências — P · Q · S por hora</h3>

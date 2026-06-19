@@ -345,7 +345,10 @@ export function LoadPage() {
         )}
 
         {/* ── Aba: P · Q · S ── */}
-        {abaEfetiva === "pqs" && <AbaPQS curva24={curva24} fp={fatorPot} setFp={setFatorPot} fpReal={fpReal} />}
+        {abaEfetiva === "pqs" && (
+          <AbaPQS curva24={curva24} fp={fatorPot} setFp={setFatorPot} fpReal={fpReal}
+            serie={serieGrafico} fonte={fonteGrafico} />
+        )}
 
         {/* ── Aba: Fatores ── */}
         {abaEfetiva === "fatores" && (
