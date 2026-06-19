@@ -118,8 +118,8 @@ LDC/Curva de Duração fora do escopo.
 - Termo **"grade 12×24" removido** do domínio de carga (caminho `tentarGrade`, parser
   de colagem, textos); matriz interna `demanda_kw` mantida; matriz 12×24 SOLAR intacta.
 
-> ⚠️ **Pendente de commit/deploy:** todo este bloco 18–19/06 ainda NÃO foi commitado.
-> Último deploy Cloudflare = commit `3eb1da6`. GitHub atrás (auth `gh` quebrada).
+> ✅ **Commitado e publicado (19/06):** commit `ed19fcf` enviado ao GitHub
+> (`main`) e deployado no Cloudflare. GitHub **em dia**.
 
 ### Fator de Potência da memória de massa — 18/06
 `loadUpload.ts` lê as colunas de reativa (kVAr/kVArh indutivo/capacitivo) e calcula
@@ -158,8 +158,11 @@ endpoint autenticado no backend.
 
 ## PRÓXIMO PASSO (retomar aqui)
 
-**0. Fechar o trabalho 18–19/06:** commitar tudo, redeployar no Cloudflare e enviar
-ao GitHub assim que a auth do `gh` (keyring) for resolvida com token escopo `repo`.
+**Auth do GitHub (RESOLVIDO 19/06):** token clássico (classic) com escopo `repo` via
+`gh auth login` → "Paste an authentication token" + `gh auth setup-git`. ⚠️ **O `git
+push` tem de sair do PowerShell interativo do usuário** — o terminal do agente roda em
+sessão de logon separada e não acessa o keyring/Credential Manager (push falha do lado
+do agente). Fluxo: o agente commita e deploya no Cloudflare; o usuário dá o `git push`.
 
 **1. Front do MOD 2 `InputGrid`** — tarifas/encargos da distribuidora (+ API ANEEL),
 mesmo padrão privado:
