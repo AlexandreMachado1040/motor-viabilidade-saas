@@ -70,7 +70,7 @@ export function DemandaDiariaChart({ serie, fonte }: Props) {
       <GraficoDiario serie={serie} fonte={fonte} sel={sel} hover={hover} stats={stats}
         onMover={diaMaisProximo} onSair={() => setHover(null)} onClicar={aoClicar} />
       <SeletorDia serie={serie} sel={sel} onSel={setFixo} />
-      <PerfilHorario dia={serie[sel]} fixo={fixo != null} />
+      <PerfilHorario dia={serie[sel]} />
     </section>
   );
 }
@@ -159,34 +159,38 @@ function GraficoDiario({
   );
 }
 
-// ── Baixo: perfil horário do dia selecionado (24 h, kW) ─────────────────────
-function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
+// ── Baixo: perfil horário do dia selecionado (24 h, kW) — estilo Aurova ──────
+// Layout local (margens próprias) para reproduzir o reference recharts sem
+// afetar o gráfico diário, que usa as constantes compartilhadas.
+const PML = 60, PMR = 24, PMT = 10, PMB = 50;
+const PPW = W - PML - PMR;
+const GRID_REF = "rgba(255,255,255,0.06)"; // grade tracejada translúcida do Aurova
+const EIXO_REF = "#666";                    // linhas/rótulos de eixo do Aurova
+
+function PerfilHorario({ dia }: { dia: DiaDemanda }) {
   const ref = useRef<SVGSVGElement>(null);
   const [hh, setHH] = useState<number | null>(null);
-  const H = 260, PH = H - MT - MB;
+  const H = 230, PH = H - PMT - PMB;
+  const base = PMT + PH;
   const yMax = niceCeil(Math.max(1, ...dia.perfil_kw));
-  const y = (v: number) => MT + PH - (v / yMax) * PH;
-  const xh = (h: number) => ML + (h / 23) * PW;
+  const y = (v: number) => PMT + PH - (v / yMax) * PH;
+  const xh = (h: number) => PML + (h / 23) * PPW;
   const pts = dia.perfil_kw.map((v, h) => ({ x: xh(h), y: y(v) }));
   const linha = caminhoSuave(pts);
-  const area = `${linha} L${pts[23].x.toFixed(1)},${MT + PH} L${pts[0].x.toFixed(1)},${MT + PH} Z`;
+  const area = `${linha} L${pts[23].x.toFixed(1)},${base} L${pts[0].x.toFixed(1)},${base} Z`;
   const ticks = Array.from({ length: 5 }, (_, i) => (yMax / 4) * i);
+  const horas = Array.from({ length: 24 }, (_, h) => h);
 
   const aoMover = (e: React.MouseEvent) => {
     const svg = ref.current; if (!svg) return;
     const r = svg.getBoundingClientRect();
     const mx = ((e.clientX - r.left) / r.width) * W;
-    const h = Math.round(((mx - ML) / PW) * 23);
+    const h = Math.round(((mx - PML) / PPW) * 23);
     setHH(Math.max(0, Math.min(23, h)));
   };
 
   return (
     <div style={{ marginTop: 4 }}>
-      <h3>Perfil horário — {dataBR(dia)}
-        <span className="muted" style={{ fontWeight: 400, fontSize: "0.8rem" }}>
-          {fixo ? "  · fixado (clique no gráfico de cima p/ soltar)" : "  · passe o mouse no gráfico de cima ou use o slider"}
-        </span>
-      </h3>
       <div style={{ background: C.painel, borderRadius: 10, padding: "8px 4px" }}>
         <svg ref={ref} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}
           onMouseMove={aoMover} onMouseLeave={() => setHH(null)}>
@@ -196,25 +200,44 @@ function PerfilHorario({ dia, fixo }: { dia: DiaDemanda; fixo: boolean }) {
               <stop offset="100%" stopColor="#005FFF" stopOpacity={0.05} />
             </linearGradient>
           </defs>
-          <EixoY H={H} yMax={yMax} ticks={ticks} unidade="kW" />
-          {/* Grade vertical por hora (par) + rótulos (ímpar, como no Aurova) */}
-          {Array.from({ length: 24 }, (_, h) => h).map((h) => (
-            <g key={h}>
-              {h % 2 === 0 && <line x1={xh(h)} y1={MT} x2={xh(h)} y2={MT + PH} stroke={C.grid} strokeWidth={1} strokeDasharray="1 4" />}
-              {h % 2 === 1 && <text x={xh(h)} y={MT + PH + 18} textAnchor="middle" fontSize={11} fill={C.txt}>{h}h</text>}
+
+          {/* Grade horizontal + rótulos/tick do eixo Y */}
+          {ticks.map((t) => (
+            <g key={`y${t}`}>
+              <line x1={PML} y1={y(t)} x2={PML + PPW} y2={y(t)} stroke={GRID_REF} strokeWidth={1} strokeDasharray="3 3" />
+              <line x1={PML - 6} y1={y(t)} x2={PML} y2={y(t)} stroke={EIXO_REF} strokeWidth={1} />
+              <text x={PML - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill={EIXO_REF}>{fmt(t)} kW</text>
             </g>
           ))}
-          <path d={area} fill="url(#dayHourFill)" />
-          <path d={linha} fill="none" stroke={C.cursor} strokeWidth={2.2} strokeLinejoin="round" />
+
+          {/* Grade vertical + rótulos/tick do eixo X em TODAS as 24 horas */}
+          {horas.map((h) => (
+            <g key={h}>
+              <line x1={xh(h)} y1={PMT} x2={xh(h)} y2={base} stroke={GRID_REF} strokeWidth={1} strokeDasharray="3 3" />
+              <line x1={xh(h)} y1={base} x2={xh(h)} y2={base + 6} stroke={EIXO_REF} strokeWidth={1} />
+              <text x={xh(h)} y={base + 18} textAnchor="middle" fontSize={11} fill={EIXO_REF}>{h}h</text>
+            </g>
+          ))}
+
+          {/* Eixos sólidos */}
+          <line x1={PML} y1={base} x2={PML + PPW} y2={base} stroke={EIXO_REF} strokeWidth={1} />
+          <line x1={PML} y1={PMT} x2={PML} y2={base} stroke={EIXO_REF} strokeWidth={1} />
+
+          <path d={area} fill="url(#dayHourFill)" fillOpacity={0.6} />
+          <path d={linha} fill="none" stroke="#00C8FF" strokeWidth={2} strokeLinejoin="round" />
+
           {hh != null && (
             <>
-              <line x1={xh(hh)} y1={MT} x2={xh(hh)} y2={MT + PH} stroke={C.cursor} strokeWidth={1.2} />
+              <line x1={xh(hh)} y1={PMT} x2={xh(hh)} y2={base} stroke={C.cursor} strokeWidth={1.2} />
               <circle cx={xh(hh)} cy={y(dia.perfil_kw[hh])} r={3.5} fill={C.cursor} stroke={C.bg} strokeWidth={1.5} />
               <Tip x={xh(hh)} y={y(dia.perfil_kw[hh])} H={H}
                 linhas={[`${hh}h–${hh + 1}h`, `${fmt(dia.perfil_kw[hh], 1)} kW`]} />
             </>
           )}
-          <text x={ML + PW / 2} y={H - 10} textAnchor="middle" fontSize={13} fill={C.txt}>Hora do dia</text>
+
+          <text x={PML + PPW / 2} y={H - 6} textAnchor="middle" fontSize={11} fill={C.muted}>
+            Perfil horário — {dataBR(dia)}
+          </text>
         </svg>
       </div>
     </div>

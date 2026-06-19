@@ -41,6 +41,7 @@ export function LoadPage() {
 
   // Campanha de Medição (curva-tipo ANEEL/CTR).
   const [campAberta, setCampAberta] = useState(false);
+  const [campAtiva, setCampAtiva] = useState(false); // curva ANEEL é a fonte ativa
   const [base, setBase] = useState<BaseId>("rede");
   const [distribuidoras, setDistribuidoras] = useState<string[]>([]);
   const [sig, setSig] = useState("");
@@ -49,6 +50,11 @@ export function LoadPage() {
   const [sbg, setSbg] = useState("");
   const [dem, setDem] = useState("");
   const demandantes = porSub[sbg] ?? [];
+
+  // Na Campanha de Medição (ANEEL) não há reativa/FP medido → P·Q·S e Fatores
+  // ficam inativas (painel aberto ou curva-tipo já carregada).
+  const bloquearAnalise = campAberta || campAtiva;
+  const abaEfetiva: Aba = bloquearAnalise && aba !== "curva" ? "curva" : aba;
 
   // Série para o gráfico: real do arquivo/campanha (se houver) ou ano representativo da matriz.
   const serieGrafico = useMemo(
@@ -93,6 +99,7 @@ export function LoadPage() {
       setSerieUpload(r.serieDiaria && r.serieDiaria.length > 0 ? r.serieDiaria : null);
       setFonteSerie("memória de massa (arquivo)");
       setFpReal(r.fp ?? null);
+      setCampAtiva(false); // upload reativa as abas de análise
       setAvisoUpload(r.aviso);
     } catch {
       setSuporteFalha({
@@ -145,6 +152,7 @@ export function LoadPage() {
   const toggleCampanha = () => {
     const abrir = !campAberta;
     setCampAberta(abrir);
+    if (abrir) setAba("curva"); // P·Q·S e Fatores ficam inativas na campanha
     if (abrir && distribuidoras.length === 0) void carregarBase(base);
   };
 
@@ -161,6 +169,8 @@ export function LoadPage() {
       setSerieUpload(res.serieDiaria);
       setFonteSerie(`Campanha ANEEL · ${res.meta.base} · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
       setFpReal(null);
+      setCampAtiva(true); // mantém P·Q·S e Fatores inativas com a curva-tipo ANEEL
+      setAba("curva");
       setAvisoUpload(
         `Campanha de Medição aplicada — ANEEL/CTR · ${res.meta.base} · ${res.meta.sig} / ${res.meta.sbg} · `
         + `${res.meta.demandante} · processo ${res.meta.ano} (${res.meta.processo}). `
@@ -185,6 +195,7 @@ export function LoadPage() {
     setSuporteFalha(null);
     // Fecha e reseta o quadro da Campanha de Medição.
     setCampAberta(false);
+    setCampAtiva(false);
     setDistribuidoras([]);
     setSubgrupos([]);
     setPorSub({});
@@ -296,17 +307,27 @@ export function LoadPage() {
           </section>
         )}
 
-        {/* Barra de abas */}
+        {/* Barra de abas — P·Q·S e Fatores ficam inativas na Campanha de Medição */}
         <div className="abas">
-          {ABAS.map((a) => (
-            <button key={a.id} className={`aba ${aba === a.id ? "ativa" : ""}`} onClick={() => setAba(a.id)}>
-              {a.rotulo}
-            </button>
-          ))}
+          {ABAS.map((a) => {
+            const bloqueada = bloquearAnalise && a.id !== "curva";
+            return (
+              <button
+                key={a.id}
+                className={`aba ${abaEfetiva === a.id ? "ativa" : ""}`}
+                disabled={bloqueada}
+                title={bloqueada ? "Indisponível na Campanha de Medição (sem reativa/FP medido)" : undefined}
+                style={bloqueada ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+                onClick={() => setAba(a.id)}
+              >
+                {a.rotulo}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── Aba: Curva de Carga ── */}
-        {aba === "curva" && (
+        {abaEfetiva === "curva" && (
           <>
             <div className="grid-kpis">
               <Kpi titulo="Demanda máxima" valor={`${fmt(local.demandaMaxima, 2)} kW`} />
@@ -324,10 +345,10 @@ export function LoadPage() {
         )}
 
         {/* ── Aba: P · Q · S ── */}
-        {aba === "pqs" && <AbaPQS curva24={curva24} fp={fatorPot} setFp={setFatorPot} fpReal={fpReal} />}
+        {abaEfetiva === "pqs" && <AbaPQS curva24={curva24} fp={fatorPot} setFp={setFatorPot} fpReal={fpReal} />}
 
         {/* ── Aba: Fatores ── */}
-        {aba === "fatores" && (
+        {abaEfetiva === "fatores" && (
           <AbaFatores curva24={curva24} mensal={mensal} dInst={dInst} setDInst={setDInst} />
         )}
       </main>
