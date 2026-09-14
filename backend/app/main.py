@@ -14,8 +14,15 @@ from .db.init_db import init_db
 from .habilitacao.router import admin_router as habilitacao_admin_router
 from .habilitacao.router import router as habilitacao_router
 from .licenca.router import router as licenca_router
+from .modulos.bess_form.router import router as bess_form_router
+from .modulos.bess_ponta.router import router as bess_ponta_router
+from .modulos.cf.router import router as cf_router
+from .modulos.gen_form.router import router as gen_form_router
+from .modulos.gen_ponta.router import router as gen_ponta_router
 from .modulos.grid.router import router as grid_router
 from .modulos.load.router import router as load_router
+from .modulos.new_grid.router import router as new_grid_router
+from .modulos.solar.router import router as solar_router
 
 
 @asynccontextmanager
@@ -46,6 +53,13 @@ app.include_router(licenca_router)
 app.include_router(admin_router)
 app.include_router(load_router)
 app.include_router(grid_router)
+app.include_router(solar_router)
+app.include_router(bess_ponta_router)
+app.include_router(gen_ponta_router)
+app.include_router(gen_form_router)
+app.include_router(bess_form_router)
+app.include_router(new_grid_router)
+app.include_router(cf_router)
 app.include_router(habilitacao_router)
 app.include_router(habilitacao_admin_router)
 
