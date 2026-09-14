@@ -177,3 +177,19 @@ def exemplo_params_cf_payload() -> Optional[dict[str, Any]]:
         return asdict(params_cf)
     except Exception:
         return None
+
+
+def get_input_gridzero_cls() -> Optional[type]:
+    try:
+        from motor_viabilidade import InputGridZero
+        return InputGridZero
+    except Exception:
+        return None
+
+
+def get_calculadora_gridzero_cls() -> Optional[type]:
+    try:
+        from motor_viabilidade import CalculadoraGridZero
+        return CalculadoraGridZero
+    except Exception:
+        return None

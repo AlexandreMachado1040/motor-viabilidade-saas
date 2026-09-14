@@ -20,6 +20,7 @@ from .modulos.cf.router import router as cf_router
 from .modulos.gen_form.router import router as gen_form_router
 from .modulos.gen_ponta.router import router as gen_ponta_router
 from .modulos.grid.router import router as grid_router
+from .modulos.gridzero.router import router as gridzero_router
 from .modulos.load.router import router as load_router
 from .modulos.new_grid.router import router as new_grid_router
 from .modulos.solar.router import router as solar_router
@@ -60,6 +61,7 @@ app.include_router(gen_form_router)
 app.include_router(bess_form_router)
 app.include_router(new_grid_router)
 app.include_router(cf_router)
+app.include_router(gridzero_router)
 app.include_router(habilitacao_router)
 app.include_router(habilitacao_admin_router)
 
