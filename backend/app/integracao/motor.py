@@ -46,3 +46,30 @@ def exemplo_load_payload() -> Optional[dict[str, Any]]:
         }
     except Exception:
         return None
+
+
+def get_input_grid_cls() -> Optional[type]:
+    """Retorna a classe motor_viabilidade.InputGrid, ou None se indisponível."""
+    try:
+        from motor_viabilidade import InputGrid
+        return InputGrid
+    except Exception:
+        return None
+
+
+def exemplo_grid_payload() -> Optional[dict[str, Any]]:
+    """Tarifas/encargos da planilha original (para pré-preencher o formulário).
+
+    InputGrid é um dataclass plano (só str/int/float, sem campo aninhado) —
+    `dataclasses.asdict` reflete os campos automaticamente, sem precisar
+    listar os 27 campos à mão (e sem risco de esquecer um se o motor ganhar
+    campo novo)."""
+    try:
+        from dataclasses import asdict
+        from motor_viabilidade.exemplos import exemplo_planilha_original
+        grid = exemplo_planilha_original().grid
+        if grid is None:
+            return None
+        return asdict(grid)
+    except Exception:
+        return None

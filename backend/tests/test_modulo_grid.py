@@ -1,0 +1,65 @@
+"""Testes do MOD 2 — InputGrid (POST/GET /modulos/grid/*).
+
+Primeiro módulo replicado do padrão de MOD 1 — InputLoad (item de
+modularização em dominios/motor-viabilidade/spec.md). Ao contrário de
+InputLoad, InputGrid é um dataclass plano do motor sem `.validar()` — não há
+estrutura variável (meses/horas) pra rejeitar, só os dois derivados
+(tarifa_ponta, tarifa_fp) que o motor calcula via @property.
+"""
+from __future__ import annotations
+
+import pytest
+from sqlalchemy.orm import Session
+
+from app.db.models import ModuleLicense, User
+from tests.conftest import auth_headers
+
+
+def _licenciar_grid(db: Session, user: User) -> None:
+    db.add(ModuleLicense(user_id=user.id, module="grid", enabled=True, source="manual"))
+    db.commit()
+    db.refresh(user)
+
+
+def test_validar_com_payload_vazio_usa_defaults_e_calcula_tarifas(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.post("/modulos/grid/validar", json={}, headers=auth_headers(usuario))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valido"] is True
+    # defaults: tusd_ponta=1.326 + te_ponta=0.379 = 1.705; tusd_fp=0.118 + te_fp=0.232 = 0.350
+    assert body["tarifa_ponta"] == 1.705
+    assert body["tarifa_fp"] == 0.35
+
+
+def test_validar_com_payload_customizado_recalcula_tarifas(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.post(
+        "/modulos/grid/validar",
+        json={"tusd_ponta": 1.0, "te_ponta": 0.5, "tusd_fp": 0.2, "te_fp": 0.1},
+        headers=auth_headers(usuario),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tarifa_ponta"] == pytest.approx(1.5)
+    assert body["tarifa_fp"] == pytest.approx(0.3)
+
+
+def test_endpoint_bloqueado_sem_licenca_do_modulo(client, usuario):
+    r = client.post("/modulos/grid/validar", json={}, headers=auth_headers(usuario))
+    assert r.status_code == 403
+
+
+def test_exemplo_devolve_dados_da_planilha_original(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.get("/modulos/grid/exemplo", headers=auth_headers(usuario))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["concessionaria"] == "Cemig-D"
+    assert body["subgrupo"] == "A4"
+    assert body["modalidade"] == "Verde"
+
+
+def test_exemplo_bloqueado_sem_licenca_do_modulo(client, usuario):
+    r = client.get("/modulos/grid/exemplo", headers=auth_headers(usuario))
+    assert r.status_code == 403

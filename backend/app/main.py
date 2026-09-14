@@ -14,6 +14,7 @@ from .db.init_db import init_db
 from .habilitacao.router import admin_router as habilitacao_admin_router
 from .habilitacao.router import router as habilitacao_router
 from .licenca.router import router as licenca_router
+from .modulos.grid.router import router as grid_router
 from .modulos.load.router import router as load_router
 
 
@@ -44,6 +45,7 @@ app.include_router(auth_router)
 app.include_router(licenca_router)
 app.include_router(admin_router)
 app.include_router(load_router)
+app.include_router(grid_router)
 app.include_router(habilitacao_router)
 app.include_router(habilitacao_admin_router)
 
