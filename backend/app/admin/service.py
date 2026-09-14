@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db.models import MODULOS, ModuleLicense, User
@@ -46,9 +46,15 @@ def definir_modulos(db: Session, user_id: int, modulos: dict[str, bool]) -> Admi
     for modulo, habilitado in modulos.items():
         lic = existentes.get(modulo)
         if lic is None:
-            db.add(ModuleLicense(user_id=user.id, module=modulo, enabled=habilitado))
+            db.add(ModuleLicense(user_id=user.id, module=modulo, enabled=habilitado, source="manual"))
         else:
+            # Ação manual do admin sobrescreve a origem — mesmo que a licença
+            # tivesse vindo de prova aprovada (source='exam'), a partir daqui
+            # é o admin que está decidindo (achado de segurança/auditoria,
+            # revisão Codex: source ficava mentindo depois de um toggle manual).
             lic.enabled = habilitado
+            lic.source = "manual"
+            lic.granted_at = func.now()
     db.commit()
     db.refresh(user)
     return _para_admin_user(user)

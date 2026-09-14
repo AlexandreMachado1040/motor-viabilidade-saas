@@ -27,10 +27,18 @@ class CalculadoraCF:
         anos = self.p.anos_projeto
         cf = {
             "CAPITAL": [0.0]*(anos+1), "REPLACEMENT": [0.0]*(anos+1),
-            "O&M": [0.0]*(anos+1), "OPERATING_FP_ENERGIA": [],
-            "OPERATING_P_ENERGIA": [], "OPERATING_FP_DEMANDA": [],
+            "O&M": [0.0]*(anos+1), "OPERATING_FP_ENERGIA": [0.0],
+            "OPERATING_P_ENERGIA": [0.0], "OPERATING_FP_DEMANDA": [0.0],
         }
-        for a in range(anos+1):
+        # Achado de auditoria (13/09): o ano 0 é o instante do investimento/
+        # decisão — ainda não houve um ano de operação, então nenhuma linha
+        # operacional (energia, demanda, O&M) pode ter valor no ano 0, nem
+        # aqui nem em cf_solar_scdee/cf_bess_ponta/cf_gen_ponta (onde isso
+        # duplicava um ano inteiro de economia sem desconto, superestimando
+        # VPL/TIR e subestimando payback — ver dominios/financeiro-viabilidade-economica/spec.md).
+        # A série do grid (baseline) precisa da MESMA convenção pra
+        # `saving_serie`/`fc_total_nominal` (calcular_cf) ficarem consistentes.
+        for a in range(1, anos+1):
             cf["OPERATING_FP_ENERGIA"].append(
                 -opex_fp_energia * self._fator_reajuste(a, self.p.reajuste_tarifa_fp))
             cf["OPERATING_P_ENERGIA"].append(
@@ -45,8 +53,9 @@ class CalculadoraCF:
         cf = {
             "CAPITAL": [-capex] + [0.0]*anos,
             "REPLACEMENT": [0.0]*(anos+1),
-            "O&M": [-om]*(anos+1),
-            "OPERATING_FP_ENERGIA": [saving_fp_energia]*(anos+1),
+            # Ano 0 = só o CAPEX (achado de auditoria 13/09 — ver cf_grid acima).
+            "O&M": [0.0] + [-om]*anos,
+            "OPERATING_FP_ENERGIA": [0.0] + [saving_fp_energia]*anos,
             "OPERATING_P_ENERGIA": [0.0]*(anos+1),
             "OPERATING_FP_DEMANDA": [0.0]*(anos+1),
         }
@@ -61,8 +70,9 @@ class CalculadoraCF:
             "CAPITAL": [-capex] + [0.0]*anos,
             "REPLACEMENT": [0.0]*(anos+1),
             "O&M": [0.0]*(anos+1),
-            "OPERATING_FP_ENERGIA": [-opex_fp_carga]*(anos+1),
-            "OPERATING_P_ENERGIA": [saving_ponta]*(anos+1),
+            # Ano 0 = só o CAPEX (achado de auditoria 13/09 — ver cf_grid acima).
+            "OPERATING_FP_ENERGIA": [0.0] + [-opex_fp_carga]*anos,
+            "OPERATING_P_ENERGIA": [0.0] + [saving_ponta]*anos,
             "OPERATING_FP_DEMANDA": [0.0]*(anos+1),
         }
         if 0 < ano_reposicao <= anos:
@@ -75,9 +85,10 @@ class CalculadoraCF:
         cf = {
             "CAPITAL": [-capex] + [0.0]*anos,
             "REPLACEMENT": [0.0]*(anos+1),
-            "O&M": [-om]*(anos+1),
+            # Ano 0 = só o CAPEX (achado de auditoria 13/09 — ver cf_grid acima).
+            "O&M": [0.0] + [-om]*anos,
             "OPERATING_FP_ENERGIA": [0.0]*(anos+1),
-            "OPERATING_P_ENERGIA": [saving_ponta]*(anos+1),
+            "OPERATING_P_ENERGIA": [0.0] + [saving_ponta]*anos,
             "OPERATING_FP_DEMANDA": [0.0]*(anos+1),
         }
         for a in range(vida_util, anos+1, vida_util):

@@ -36,9 +36,22 @@ def get_current_user(
 
 
 def require_module(modulo: str):
-    """Fábrica de dependency que exige a licença de um módulo específico."""
+    """Fábrica de dependency que exige a licença de um módulo específico —
+    inclusive validade: `user.modulos_ativos` (única fonte de verdade, ver
+    db/models.py) já exclui licença com `expires_at` vencido, então uma
+    licença expirada é tratada exatamente como módulo nunca contratado no
+    ponto de decisão. A única diferença aqui é a mensagem de erro: se existe
+    uma `ModuleLicense` para o módulo mas ela caiu fora de `modulos_ativos`
+    por expiração (não por `enabled=False`), avisamos que expirou em vez de
+    dizer "não contratado" — mais preciso pro usuário que já teve acesso."""
     def _dep(user: User = Depends(get_current_user)) -> User:
         if modulo not in user.modulos_ativos:
+            lic = next((l for l in user.licenses if l.module == modulo), None)
+            if lic is not None and lic.enabled and lic.expirada():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Licença do módulo '{modulo}' expirou. Renove para continuar com acesso.",
+                )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(f"Módulo '{modulo}' não contratado. "

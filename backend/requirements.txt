@@ -8,4 +8,5 @@ pyjwt>=2.8                  # emissão/validação do JWT próprio
 sqlalchemy>=2.0            # ORM (User + licenças de módulo)
 alembic>=1.13              # migrações de schema
 pydantic-settings>=2.2     # configuração via .env
+email-validator>=2.0       # validação de EmailStr (auth/admin schemas)
 python-dotenv>=1.0
