@@ -193,3 +193,21 @@ def get_calculadora_gridzero_cls() -> Optional[type]:
         return CalculadoraGridZero
     except Exception:
         return None
+
+
+def get_estudo_viabilidade_cls() -> Optional[type]:
+    """Retorna motor_viabilidade.EstudoViabilidade, o orquestrador que o
+    MOD 10 (summary) usa pra carregar os módulos e agregar o resultado final."""
+    try:
+        from motor_viabilidade import EstudoViabilidade
+        return EstudoViabilidade
+    except Exception:
+        return None
+
+
+def get_licenca_modulos_cls() -> Optional[type]:
+    try:
+        from motor_viabilidade import LicencaModulos
+        return LicencaModulos
+    except Exception:
+        return None
