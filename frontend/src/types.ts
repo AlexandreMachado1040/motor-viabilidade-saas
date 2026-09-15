@@ -52,6 +52,44 @@ export interface LoadResumo {
   pico_mensal_kw: number[];
 }
 
+// ── MOD 10 — Summary (estudo de viabilidade completo) ────────────────────────
+// Os payloads dos módulos de referência (grid, solar, bess_ponta, cf) passam
+// adiante sem edição nesta tela — o backend valida cada um pelo schema do
+// próprio módulo, então aqui ficam opacos.
+export type PayloadModulo = Record<string, unknown>;
+
+export interface SummaryPayload {
+  load: InputLoadPayload;
+  grid: PayloadModulo;
+  params_cf?: PayloadModulo;
+  solar?: PayloadModulo | null;
+  bess_ponta?: PayloadModulo | null;
+}
+
+export interface SummaryResumo {
+  valido: boolean;
+  erros: string[];
+  projeto: {
+    concessionaria: string | null;
+    subgrupo: string | null;
+    demanda_maxima_kw: number | null;
+    potencia_solar_kwp: number | null;
+    energia_bess_kwh: number | null;
+  };
+  custos: {
+    opex_grid_anual: number | null;
+    capex_total: number | null;
+  };
+  indicadores: {
+    vpl: number | null;
+    tir_pct: number | null;
+    payback: number | null;
+    roi: number | null;
+    viavel: boolean | null;
+  };
+  modulos_ativos: Record<string, boolean>;
+}
+
 /** Fator de potência extraído da memória de massa (colunas de reativa). */
 export interface FPInfo {
   pPorHora: number[];    // 24 — potência ativa média (kW) por hora

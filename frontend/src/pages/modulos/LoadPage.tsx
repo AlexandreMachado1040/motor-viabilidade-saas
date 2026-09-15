@@ -11,6 +11,7 @@ import { curvaTipica } from "./loadAnalise";
 import { BASES_CTR, carregarCampanha, listarDistribuidoras, listarOpcoes } from "./campanhaAneel";
 import type { BaseId } from "./campanhaAneel";
 import type { DiaDemanda, FPInfo } from "../../types";
+import { useEstudo } from "../../estudo/useEstudo";
 
 type Aba = "curva" | "pqs" | "fatores";
 const ABAS: { id: Aba; rotulo: string }[] = [
@@ -23,6 +24,8 @@ const ABAS: { id: Aba; rotulo: string }[] = [
 const SUPORTE_EMAIL = "suporte@aurova.com.br";
 
 export function LoadPage() {
+  // Carga carregada aqui vira a entrada do Resumo do Estudo (MOD 10).
+  const { definirLoad, limparLoad } = useEstudo();
   const [matriz, setMatriz] = useState<number[][]>(matrizZerada);
   const [ponta, setPonta] = useState<number[]>(vetorZerado);
   const [fp, setFp] = useState<number[]>(vetorZerado);
@@ -102,6 +105,7 @@ export function LoadPage() {
       setFpReal(r.fp ?? null);
       setCampAtiva(false); // upload reativa as abas de análise
       setAvisoUpload(r.aviso);
+      definirLoad(r.payload, `Memória de massa · ${file.name}`);
     } catch {
       setSuporteFalha({
         arquivo: file.name,
@@ -170,6 +174,7 @@ export function LoadPage() {
       setSerieUpload(res.serieDiaria);
       setFonteSerie(`Campanha ANEEL · ${res.meta.base} · ${res.meta.sig}/${res.meta.sbg} · ${res.meta.demandante}`);
       setFpReal(null);
+      definirLoad(res.payload, `Campanha ANEEL · ${res.meta.sig} / ${res.meta.sbg} · ${res.meta.demandante}`);
       setCampAtiva(true); // mantém P·Q·S e Fatores inativas com a curva-tipo ANEEL
       setAba("curva");
       setAvisoUpload(
@@ -185,6 +190,7 @@ export function LoadPage() {
   };
 
   const limpar = () => {
+    limparLoad();
     setMatriz(matrizZerada());
     setPonta(vetorZerado());
     setFp(vetorZerado());
