@@ -2,7 +2,8 @@ import { api } from "./client";
 import { DEMO_MODE } from "../config";
 import { EXEMPLO_LOAD, validarLoadLocal } from "../pages/modulos/loadDemo";
 import type {
-  InputLoadPayload, LoadResumo, PayloadModulo, SummaryPayload, SummaryResumo,
+  InputLoadPayload, LoadResumo, PayloadModulo, SimuladorTarifasPayload, SimuladorTarifasResumo,
+  SummaryPayload, SummaryResumo,
 } from "../types";
 
 // ── MOD 1 — InputLoad ────────────────────────────────────────────────────────
@@ -29,4 +30,14 @@ export function getExemploModulo(modulo: ModuloComExemplo): Promise<PayloadModul
 // existe no motor Python. No modo demo a página mostra aviso em vez de chamar.
 export function calcularEstudo(payload: SummaryPayload): Promise<SummaryResumo> {
   return api.post<SummaryResumo>("/modulos/summary/validar", payload).then((r) => r.data);
+}
+
+// ── MOD 2 — Simulador de modalidades tarifárias ─────────────────────────────
+// Cálculo só no motor Python (sem versão no navegador), como o summary.
+export function getExemploTarifas(): Promise<SimuladorTarifasPayload> {
+  return api.get<SimuladorTarifasPayload>("/modulos/grid/exemplo-tarifas").then((r) => r.data);
+}
+
+export function simularTarifas(payload: SimuladorTarifasPayload): Promise<SimuladorTarifasResumo> {
+  return api.post<SimuladorTarifasResumo>("/modulos/grid/simular-tarifas", payload).then((r) => r.data);
 }

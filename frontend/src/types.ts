@@ -41,6 +41,13 @@ export interface InputLoadPayload {
   energia_fp_kwh: number[]; // 12
 }
 
+// Demanda máxima de cada mês por posto (kW), medida no intervalo do arquivo.
+// Só existe para memória de massa real — curva-tipo não tem pico de fatura.
+export interface PicosMensais {
+  demanda_ponta_kw: (number | null)[]; // 12; null = mês sem leitura
+  demanda_fp_kw: (number | null)[]; // 12
+}
+
 export interface LoadResumo {
   valido: boolean;
   erros: string[];
@@ -111,4 +118,59 @@ export interface DiaDemanda {
   total_kwh: number;
   pico_kw: number;
   perfil_kw: number[]; // 24 — kW médio por hora
+}
+
+// ── MOD 2 — Simulador de modalidades tarifárias ─────────────────────────────
+export interface TarifasConvencional { demanda: number; consumo: number }
+export interface TarifasAzul {
+  demanda_ponta: number; demanda_fp: number; consumo_ponta: number; consumo_fp: number;
+  consumo_ponta_umido?: number | null; consumo_fp_umido?: number | null;
+}
+export interface TarifasVerde {
+  demanda: number; consumo_ponta: number; consumo_fp: number;
+  consumo_ponta_umido?: number | null; consumo_fp_umido?: number | null;
+}
+export interface TarifasBaixaTensao { consumo: number }
+
+export interface SimuladorTarifasPayload {
+  demanda_ponta_kw: number[];
+  demanda_fp_kw: number[];
+  consumo_ponta_kwh: number[];
+  consumo_fp_kwh: number[];
+  demanda_contratada_kw: number;
+  demanda_contratada_ponta_kw: number;
+  demanda_contratada_fp_kw: number;
+  tolerancia_ultrapassagem: number;
+  fator_ultrapassagem: number;
+  convencional: TarifasConvencional | null;
+  azul: TarifasAzul | null;
+  verde: TarifasVerde | null;
+  baixa_tensao: TarifasBaixaTensao | null;
+}
+
+export interface ModalidadeResultado {
+  modalidade: string;
+  custo_anual: number;
+  custo_mensal: number[];
+  componentes: Record<string, number>;
+  ultrapassagem_anual: number;
+  meses_com_ultrapassagem: number;
+}
+
+export interface DemandaSugerida {
+  modalidade: string;
+  demanda_kw: number | null;
+  demanda_ponta_kw: number | null;
+  demanda_fp_kw: number | null;
+  custo_anual: number;
+  economia_anual: number;
+}
+
+export interface SimuladorTarifasResumo {
+  valido: boolean;
+  erros: string[];
+  modalidades: ModalidadeResultado[];
+  recomendada: string | null;
+  economia_vs_atual: Record<string, number>;
+  demandas_sugeridas: DemandaSugerida[];
 }

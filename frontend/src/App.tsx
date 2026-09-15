@@ -6,6 +6,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { CallbackPage } from "./pages/CallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { GridPage } from "./pages/modulos/GridPage";
 import { LoadPage } from "./pages/modulos/LoadPage";
 import { SummaryPage } from "./pages/modulos/SummaryPage";
 
@@ -38,6 +39,14 @@ export default function App() {
             element={
               <ProtectedRoute modulo="load">
                 <LoadPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/modulos/grid"
+            element={
+              <ProtectedRoute modulo="grid">
+                <GridPage />
               </ProtectedRoute>
             }
           />

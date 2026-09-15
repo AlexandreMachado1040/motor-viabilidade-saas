@@ -63,3 +63,62 @@ def test_exemplo_devolve_dados_da_planilha_original(client, db_session, usuario)
 def test_exemplo_bloqueado_sem_licenca_do_modulo(client, usuario):
     r = client.get("/modulos/grid/exemplo", headers=auth_headers(usuario))
     assert r.status_code == 403
+
+
+# ── Simulador de modalidades tarifárias ──────────────────────────────────────
+
+def test_exemplo_tarifas_traz_doze_meses_e_tres_modalidades(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.get("/modulos/grid/exemplo-tarifas", headers=auth_headers(usuario))
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["demanda_fp_kw"]) == 12
+    assert body["azul"]["demanda_ponta"] == pytest.approx(28.41)
+    assert body["baixa_tensao"] is None
+
+
+def test_simular_tarifas_do_exemplo_recomenda_a_mais_barata(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    h = auth_headers(usuario)
+    exemplo = client.get("/modulos/grid/exemplo-tarifas", headers=h).json()
+    r = client.post("/modulos/grid/simular-tarifas", json=exemplo, headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valido"] is True
+    custos = {m["modalidade"]: m["custo_anual"] for m in body["modalidades"]}
+    assert set(custos) == {"Convencional", "Azul", "Verde"}
+    assert body["recomendada"] == min(custos, key=custos.get)
+    assert body["economia_vs_atual"][body["recomendada"]] == 0
+    assert {s["modalidade"] for s in body["demandas_sugeridas"]} == {"Convencional", "Azul", "Verde"}
+
+
+def test_simular_tarifas_devolve_erros_de_estrutura(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.post(
+        "/modulos/grid/simular-tarifas",
+        json={"demanda_ponta_kw": [1.0] * 11, "demanda_fp_kw": [0.0] * 12,
+              "consumo_ponta_kwh": [0.0] * 12, "consumo_fp_kwh": [0.0] * 12},
+        headers=auth_headers(usuario),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valido"] is False
+    assert "demanda_ponta_kw deve ter 12 meses (recebido: 11)." in body["erros"]
+    assert "Informe as tarifas de pelo menos uma modalidade." in body["erros"]
+
+
+def test_simular_tarifas_rejeita_tarifa_negativa(client, db_session, usuario):
+    _licenciar_grid(db_session, usuario)
+    r = client.post(
+        "/modulos/grid/simular-tarifas",
+        json={"demanda_ponta_kw": [0.0] * 12, "demanda_fp_kw": [0.0] * 12,
+              "consumo_ponta_kwh": [0.0] * 12, "consumo_fp_kwh": [0.0] * 12,
+              "baixa_tensao": {"consumo": -1}},
+        headers=auth_headers(usuario),
+    )
+    assert r.status_code == 422
+
+
+def test_simulador_bloqueado_sem_licenca(client, usuario):
+    r = client.post("/modulos/grid/simular-tarifas", json={}, headers=auth_headers(usuario))
+    assert r.status_code == 403

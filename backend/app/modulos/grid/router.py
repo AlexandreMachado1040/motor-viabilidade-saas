@@ -8,6 +8,8 @@ from ...db.models import User
 from ...integracao.motor import exemplo_grid_payload
 from .schemas import GridResumo, InputGridPayload
 from .service import validar_grid
+from .tarifas_schemas import SimuladorTarifasPayload, SimuladorTarifasResumo
+from .tarifas_service import exemplo_tarifas, simular_tarifas
 
 router = APIRouter(
     prefix="/modulos/grid",
@@ -32,3 +34,15 @@ def exemplo(_user: User = Depends(require_module("grid"))) -> InputGridPayload:
             "Exemplo indisponível (pacote motor_viabilidade não encontrado).",
         )
     return InputGridPayload(**dados)
+
+
+@router.post("/simular-tarifas", response_model=SimuladorTarifasResumo)
+def simular(payload: SimuladorTarifasPayload) -> SimuladorTarifasResumo:
+    """Compara o custo anual das modalidades tarifárias e recomenda a mais barata."""
+    return simular_tarifas(payload)
+
+
+@router.get("/exemplo-tarifas", response_model=SimuladorTarifasPayload)
+def exemplo_simulador() -> SimuladorTarifasPayload:
+    """Dados da planilha SIMULADOR TARIFAS ANUAL para pré-preencher a página."""
+    return exemplo_tarifas()

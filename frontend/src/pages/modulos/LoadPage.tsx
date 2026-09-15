@@ -105,7 +105,7 @@ export function LoadPage() {
       setFpReal(r.fp ?? null);
       setCampAtiva(false); // upload reativa as abas de análise
       setAvisoUpload(r.aviso);
-      definirLoad(r.payload, `Memória de massa · ${file.name}`);
+      definirLoad(r.payload, `Memória de massa · ${file.name}`, r.picos);
     } catch {
       setSuporteFalha({
         arquivo: file.name,

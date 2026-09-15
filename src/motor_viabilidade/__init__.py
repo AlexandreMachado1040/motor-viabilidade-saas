@@ -44,6 +44,7 @@ from .ConfigAPIANEEL import ConfigAPIANEEL
 from .ClienteAPIANEEL import ClienteAPIANEEL
 from .InputLoad import InputLoad
 from .InputGrid import InputGrid
+from .SimuladorTarifas import InputSimuladorTarifas, SimuladorTarifas
 from .InputSolarSCDEE import InputSolarSCDEE
 from .InputBESSPonta import InputBESSPonta
 from .InputGeradorPonta import InputGeradorPonta
@@ -68,6 +69,7 @@ __all__ = [
     "LicencaModulos",
     "ConfigAPIANEEL", "ClienteAPIANEEL",
     "InputLoad", "InputGrid", "InputSolarSCDEE",
+    "InputSimuladorTarifas", "SimuladorTarifas",
     "InputBESSPonta", "InputGeradorPonta", "InputGeradorFormador",
     "InputBESSFormador", "SolarHibridoParams", "InputNewGrid",
     "InputGridZero", "ResultadoGridZero", "CalculadoraGridZero",

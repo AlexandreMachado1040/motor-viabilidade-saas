@@ -5,6 +5,7 @@ import { DEMO_MODE } from "../config";
 // Módulos que já possuem front próprio (navegação privada).
 const FRONTS: Record<string, string> = {
   load: "/modulos/load",
+  grid: "/modulos/grid",
   summary: "/modulos/summary",
 };
 

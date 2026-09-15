@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { DiaDemanda, FPInfo, InputLoadPayload } from "../../types";
+import type { DiaDemanda, FPInfo, InputLoadPayload, PicosMensais } from "../../types";
 import { diaDoAno } from "./loadUtils";
 
 export interface ResultadoUpload {
@@ -8,6 +8,7 @@ export interface ResultadoUpload {
   payload?: InputLoadPayload;
   serieDiaria?: DiaDemanda[];
   fp?: FPInfo;
+  picos?: PicosMensais;
   aviso: string;
 }
 
@@ -47,7 +48,7 @@ function celulaNumero(c: unknown): number | null {
   return Number.isNaN(v) ? null : v;
 }
 
-function parseMomento(dataCell: string, timeCell?: string):
+function parseMomento(dataCell: string, timeCell?: string, horaNumerica = false):
   { ano: number; mes: number; dia: number; hora: number } | null {
   const s = String(dataCell ?? "").trim();
   let dia = 0, mes = 0, ano = 0;
@@ -63,6 +64,8 @@ function parseMomento(dataCell: string, timeCell?: string):
     const t = String(timeCell).match(/(\d{1,2}):(\d{2})/);
     if (t) hora = +t[1];
   }
+  // Coluna Hora numérica (0–23 ou 1–24): a hora vem de hora1b em agregar().
+  if (hora == null && horaNumerica) hora = 0;
   if (hora == null) return null;
   if (ano < 100) ano += 2000;
   if (mes < 1 || mes > 12 || dia < 1 || dia > 31 || hora < 0 || hora > 23) return null;
@@ -75,7 +78,7 @@ function detectarDelimitador(linhas: string[]): string {
   const amostra = linhas.slice(0, 8);
   let melhor = ";", melhorCols = 0;
   for (const d of cands) {
-    const cols = amostra.map((l) => l.split(d).length).sort((a, b) => a - b);
+    const cols = amostra.map((l) => dividirLinha(l, d).length).sort((a, b) => a - b);
     const mediana = cols[Math.floor(cols.length / 2)] || 1; // robusta a linhas atípicas
     if (mediana > melhorCols) { melhorCols = mediana; melhor = d; }
   }
@@ -97,7 +100,28 @@ export async function lerPlanilha(file: File): Promise<string[][]> {
   if (texto.includes("�")) texto = new TextDecoder("windows-1252").decode(buf);
   const linhas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const delim = detectarDelimitador(linhas);
-  return linhas.map((l) => l.split(delim).map((c) => c.trim()));
+  return linhas.map((l) => dividirLinha(l, delim));
+}
+
+/** Divide uma linha CSV respeitando campos entre aspas ("1.234,56" com `,` ou `;`). */
+export function dividirLinha(linha: string, delim: string): string[] {
+  const campos: string[] = [];
+  let atual = "";
+  let aspas = false;
+  for (let i = 0; i < linha.length; i++) {
+    const ch = linha[i];
+    if (ch === '"') {
+      if (aspas && linha[i + 1] === '"') { atual += '"'; i++; }
+      else aspas = !aspas;
+    } else if (ch === delim && !aspas) {
+      campos.push(atual.trim());
+      atual = "";
+    } else {
+      atual += ch;
+    }
+  }
+  campos.push(atual.trim());
+  return campos;
 }
 
 /** Auto-detecta o formato e devolve o InputLoadPayload preenchido. */
@@ -146,13 +170,14 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
   for (const r of body) {
     const val = celulaNumero(r[c.valIdx]);
     if (val == null) continue;
-    const mom = parseMomento(r[c.dateIdx] ?? "", c.horaIdx >= 0 ? r[c.horaIdx] : undefined);
     let hora1b: number | null = null;
     if (c.horaIdx >= 0) {
       const hn = celulaNumero(r[c.horaIdx]);
-      if (hn != null) { hora1b = Math.round(hn); horas1b.add(hora1b); }
+      if (hn != null) hora1b = Math.round(hn);
     }
+    const mom = parseMomento(r[c.dateIdx] ?? "", c.horaIdx >= 0 ? r[c.horaIdx] : undefined, hora1b != null);
     if (!mom) continue;
+    if (hora1b != null) horas1b.add(hora1b);
     tmp.push({
       ano: mom.ano, mes: mom.mes, dia: mom.dia,
       hora1b, horaTs: mom.hora, val,
@@ -184,6 +209,10 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
   const cnt = Array.from({ length: 12 }, () => Array(24).fill(0));
   const pAM = new Map<string, number>();
   const fAM = new Map<string, number>();
+  // Demanda máxima por (ano-mês) e posto — é o que a fatura cobra, ao
+  // contrário da matriz, que guarda a média por mês-hora.
+  const picoPAM = new Map<string, number>();
+  const picoFAM = new Map<string, number>();
   let maxKw = 0;
   let usaPosto = false;
 
@@ -223,6 +252,8 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     const am = `${t.ano}-${t.mes}`;
     const mapa = ehPonta ? pAM : fAM;
     mapa.set(am, (mapa.get(am) || 0) + kwh);
+    const picos = ehPonta ? picoPAM : picoFAM;
+    if (kw > (picos.get(am) ?? 0)) picos.set(am, kw);
 
     // Reativa (kVAr) na mesma escala de potência da curva.
     const qkvar = c.isEnergia ? (t.qInd + t.qCap) / dt : (t.qInd + t.qCap);
@@ -239,6 +270,9 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
   // energia representativa por mês: média entre os anos presentes (evita dupla contagem)
   const ponta = Array(12).fill(0);
   const fp = Array(12).fill(0);
+  // null = mês sem nenhuma leitura no arquivo (diferente de pico zero).
+  const picoPonta: (number | null)[] = Array(12).fill(null);
+  const picoFp: (number | null)[] = Array(12).fill(null);
   for (let mes = 1; mes <= 12; mes++) {
     const anos = new Set<number>();
     for (const k of [...pAM.keys(), ...fAM.keys()]) {
@@ -250,6 +284,14 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     for (const a of anos) { sp += pAM.get(`${a}-${mes}`) || 0; sf += fAM.get(`${a}-${mes}`) || 0; }
     ponta[mes - 1] = +(sp / anos.size).toFixed(2);
     fp[mes - 1] = +(sf / anos.size).toFixed(2);
+    // Média de cada posto só sobre os anos em que ele tem leitura: ano sem
+    // aquele posto não entra no divisor como pico zero.
+    const mediaPico = (mapa: Map<string, number>) => {
+      const vals = [...anos].map((a) => mapa.get(`${a}-${mes}`)).filter((v): v is number => v != null);
+      return vals.length > 0 ? +(vals.reduce((x, y) => x + y, 0) / vals.length).toFixed(2) : 0;
+    };
+    picoPonta[mes - 1] = mediaPico(picoPAM);
+    picoFp[mes - 1] = mediaPico(picoFAM);
   }
 
   // Série diária: colapsa múltiplos anos num ano representativo (média por mês-dia).
@@ -297,6 +339,7 @@ function agregar(body: string[][], c: Cols): ResultadoUpload {
     },
     serieDiaria,
     fp: fpInfo,
+    picos: { demanda_ponta_kw: picoPonta, demanda_fp_kw: picoFp },
     aviso: `Importado ${tipoVal}: ${resolved.length.toLocaleString("pt-BR")} leituras · `
       + `intervalo ${Math.round(dt * 60)} min · ${classif}. Demanda mensal/horária e energia mensal preenchidas.${avisoFP}`,
   };

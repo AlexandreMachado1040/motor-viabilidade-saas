@@ -281,3 +281,16 @@ body {
 .resultado.ok { background: #0f2a1c; border: 1px solid var(--green); }
 .resultado.falha { background: #2a1414; border: 1px solid var(--red); }
 .resultado ul { margin: 8px 0 0; padding-left: 18px; }
+
+/* MOD 2 — Simulador de Tarifas */
+.tarifa-modalidade {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 0; border-bottom: 1px solid var(--rail);
+}
+.tarifa-modalidade:last-child { border-bottom: none; }
+.tarifa-modalidade.off .linha-campos { opacity: 0.45; }
+.tarifa-modalidade .check { font-weight: 600; }
+.campo.campo-tarifa input { min-width: 0; width: 170px; }
+.campo input:disabled { cursor: not-allowed; }
+.tabela-admin td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tabela-admin td.componentes { white-space: normal; font-size: 12px; color: var(--muted); min-width: 280px; }

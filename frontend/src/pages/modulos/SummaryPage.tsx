@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { isAxiosError } from "axios";
+import { mensagemDeErro } from "../../api/erros";
 import { calcularEstudo, getExemploLoad, getExemploModulo } from "../../api/modulos";
 import type { ModuloComExemplo } from "../../api/modulos";
 import { useAuth } from "../../auth/useAuth";
@@ -41,17 +41,6 @@ const texto = (o: PayloadModulo | undefined, campo: string): string | null => {
   return typeof v === "string" ? v : null;
 };
 
-export function mensagemDeErro(e: unknown): string {
-  if (isAxiosError(e)) {
-    const detail = (e.response?.data as { detail?: unknown } | undefined)?.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail) && detail.length > 0) {
-      return "Os dados enviados não passaram na validação do servidor.";
-    }
-    if (!e.response) return "Sem resposta do servidor. Verifique se o backend está rodando.";
-  }
-  return "Falha inesperada ao calcular o estudo.";
-}
 
 export function SummaryPage() {
   const { temModulo } = useAuth();
@@ -125,7 +114,7 @@ export function SummaryPage() {
     try {
       setResultado(await calcularEstudo(payload));
     } catch (e) {
-      setErro(mensagemDeErro(e));
+      setErro(mensagemDeErro(e, "Falha inesperada ao calcular o estudo."));
     } finally {
       setCalculando(false);
     }

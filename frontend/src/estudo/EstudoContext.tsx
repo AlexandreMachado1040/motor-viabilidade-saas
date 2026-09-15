@@ -1,20 +1,21 @@
 import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
-import type { InputLoadPayload } from "../types";
+import type { InputLoadPayload, PicosMensais } from "../types";
 
 // Dados de entrada do estudo compartilhados entre as páginas de módulo.
-// Hoje só o load (MOD 1) tem tela própria; o summary (MOD 10) consome o que o
-// usuário carregou ali. sessionStorage para sobreviver a um recarregamento da
+// O load (MOD 1) é carregado numa tela e consumido pelo simulador de tarifas
+// (MOD 2) e pelo resumo (MOD 10). sessionStorage para sobreviver a um recarregamento da
 // página sem vazar entre abas/sessões.
 const CHAVE = "motor-viabilidade:estudo:load";
 
 export interface LoadDoEstudo {
   payload: InputLoadPayload;
   fonte: string;
+  picos?: PicosMensais;
 }
 
 interface EstudoState {
   load: LoadDoEstudo | null;
-  definirLoad: (payload: InputLoadPayload, fonte: string) => void;
+  definirLoad: (payload: InputLoadPayload, fonte: string, picos?: PicosMensais) => void;
   limparLoad: () => void;
 }
 
@@ -41,8 +42,8 @@ function salvar(valor: LoadDoEstudo | null): void {
 export function EstudoProvider({ children }: { children: ReactNode }) {
   const [load, setLoad] = useState<LoadDoEstudo | null>(lerSalvo);
 
-  const definirLoad = useCallback((payload: InputLoadPayload, fonte: string) => {
-    const valor = { payload, fonte };
+  const definirLoad = useCallback((payload: InputLoadPayload, fonte: string, picos?: PicosMensais) => {
+    const valor: LoadDoEstudo = picos ? { payload, fonte, picos } : { payload, fonte };
     setLoad(valor);
     salvar(valor);
   }, []);

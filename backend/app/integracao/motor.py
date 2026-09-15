@@ -75,6 +75,17 @@ def exemplo_grid_payload() -> Optional[dict[str, Any]]:
         return None
 
 
+def get_simulador_tarifas_mod() -> Optional[Any]:
+    """Retorna o módulo motor_viabilidade.SimuladorTarifas (classes + exemplo)."""
+    try:
+        # import_module, não `from ... import`: o pacote reexporta a classe
+        # SimuladorTarifas com o mesmo nome do submódulo.
+        import importlib
+        return importlib.import_module("motor_viabilidade.SimuladorTarifas")
+    except Exception:
+        return None
+
+
 # ── Módulos 3-9: mesmo par (get_*_cls, exemplo_*_payload) dos módulos acima.
 # `exemplo_planilha_original()` só carrega load/grid/solar/bess_ponta/cf — os
 # outros (gen_ponta, gen_form, bess_form, new_grid) não têm dado de exemplo
