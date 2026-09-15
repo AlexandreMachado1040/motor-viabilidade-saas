@@ -176,3 +176,31 @@ def test_validar_exige_tarifas_e_modalidade_juntas(client, db_session, usuario):
     r = client.post("/modulos/summary/validar",
                     json={**_payload_referencia(client, usuario), "modalidade": "azul"}, headers=h)
     assert r.status_code == 422
+
+
+
+def test_validar_recusa_modulo_de_investimento_sem_licenca(client, db_session, usuario):
+    """Licença de summary não autoriza calcular solar/BESS enviados à mão."""
+    _licenciar(db_session, usuario, "summary", "load", "grid", "solar", "bess_ponta")
+    payload = _payload_referencia(client, usuario)
+    db_session.query(ModuleLicense).filter_by(user_id=usuario.id, module="bess_ponta").delete()
+    db_session.commit()
+    db_session.refresh(usuario)
+    r = client.post("/modulos/summary/validar", json=payload, headers=auth_headers(usuario))
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Módulos não contratados no estudo: bess_ponta."
+
+
+def test_validar_recusa_tarifas_do_simulador_sem_licenca_de_grid(client, db_session, usuario):
+    _licenciar(db_session, usuario, "summary", "load", "grid")
+    h = auth_headers(usuario)
+    tarifas = client.get("/modulos/grid/exemplo-tarifas", headers=h).json()
+    payload = {"load": client.get("/modulos/load/exemplo", headers=h).json(),
+               "grid": client.get("/modulos/grid/exemplo", headers=h).json(),
+               "tarifas": tarifas, "modalidade": "verde"}
+    db_session.query(ModuleLicense).filter_by(user_id=usuario.id, module="grid").delete()
+    db_session.commit()
+    db_session.refresh(usuario)
+    r = client.post("/modulos/summary/validar", json=payload, headers=h)
+    assert r.status_code == 403
+    assert "grid" in r.json()["detail"]

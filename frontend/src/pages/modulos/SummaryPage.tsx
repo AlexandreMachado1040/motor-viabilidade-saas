@@ -7,6 +7,7 @@ import { useAuth } from "../../auth/useAuth";
 import { DEMO_MODE } from "../../config";
 import { useEstudo } from "../../estudo/useEstudo";
 import type { InputLoadPayload, PayloadModulo, SummaryPayload, SummaryResumo } from "../../types";
+import { BESS_PONTA, CF, SOLAR } from "./investimentos";
 import { fmt } from "./loadUtils";
 
 type Investimento = "solar" | "bess_ponta";
@@ -34,11 +35,6 @@ const mesmaSerie = (a: number[] | undefined, b: number[]) =>
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-const num = (o: PayloadModulo | undefined, campo: string): number | null => {
-  const v = o?.[campo];
-  return typeof v === "number" ? v : null;
-};
-
 const texto = (o: PayloadModulo | undefined, campo: string): string | null => {
   const v = o?.[campo];
   return typeof v === "string" ? v : null;
@@ -47,7 +43,7 @@ const texto = (o: PayloadModulo | undefined, campo: string): string | null => {
 
 export function SummaryPage() {
   const { temModulo } = useAuth();
-  const { load: loadUsuario, tarifas: tarifasUsuario, limparTarifas } = useEstudo();
+  const { load: loadUsuario, tarifas: tarifasUsuario, limparTarifas, investimentos } = useEstudo();
 
   const [refs, setRefs] = useState<Referencias>({});
   const [carregandoRefs, setCarregandoRefs] = useState(!DEMO_MODE);
@@ -85,9 +81,20 @@ export function SummaryPage() {
   }, [temModulo]);
 
   const loadEfetivo = loadUsuario?.payload ?? refs.load;
+  // Valor salvo na tela do módulo tem prioridade sobre a referência; os dois
+  // só valem com licença do módulo. A licença decide — não o sucesso da busca
+  // da referência, que pode falhar sem o módulo deixar de ser contratado.
+  const efetivo = (m: Investimento | "cf"): PayloadModulo | undefined =>
+    temModulo(m) ? (investimentos[m] ?? refs[m]) : undefined;
+  const semDados = (m: Investimento, rotulo: string) =>
+    temModulo(m) ? "Referência indisponível — salve os dados na tela do módulo" : `Módulo ${rotulo} não licenciado`;
+  const solar = efetivo("solar");
+  const bessPonta = efetivo("bess_ponta");
+  const cf = efetivo("cf");
   const investimentosAtivos = (["solar", "bess_ponta"] as Investimento[])
     .filter((m) => incluir[m] && refs[m] !== undefined);
-  const misturaCargaPropria = loadUsuario !== null && investimentosAtivos.length > 0;
+  const misturaCargaPropria = loadUsuario !== null
+    && investimentosAtivos.some((m) => investimentos[m] === undefined);
   // A fatura do simulador usa o consumo digitado lá; se ele não bate com a
   // energia da carga do estudo (outra carga, edição manual, arquivo trocado),
   // custo da rede e economia partem de dados diferentes. Compara os dados, não
@@ -114,10 +121,10 @@ export function SummaryPage() {
     const payload: SummaryPayload = {
       load: loadEfetivo,
       grid: refs.grid,
-      solar: incluir.solar && refs.solar ? refs.solar : null,
-      bess_ponta: incluir.bess_ponta && refs.bess_ponta ? refs.bess_ponta : null,
+      solar: incluir.solar && solar ? solar : null,
+      bess_ponta: incluir.bess_ponta && bessPonta ? bessPonta : null,
     };
-    if (refs.cf) payload.params_cf = refs.cf;
+    if (cf) payload.params_cf = cf;
     if (tarifasUsuario) {
       payload.tarifas = tarifasUsuario.payload;
       payload.modalidade = tarifasUsuario.modalidade;
@@ -202,12 +209,16 @@ export function SummaryPage() {
                   />
                   <Entrada
                     rotulo="Parâmetros financeiros"
-                    valor={
-                      refs.cf
-                        ? `Desconto ${fmt((num(refs.cf, "taxa_desconto") ?? 0) * 100, 2)}% a.a. · ${num(refs.cf, "anos_projeto")} anos`
-                        : "Padrão do motor · desconto 8% a.a. · 25 anos"
+                    valor={cf ? CF.resumir(cf) : "Padrão do motor · desconto 8% a.a. · 25 anos"}
+                    detalhe={
+                      cf ? (
+                        <Link className="btn-link" to="/modulos/cf">
+                          {investimentos.cf ? "personalizado · editar" : "referência · editar"}
+                        </Link>
+                      ) : (
+                        <span className="muted">padrão</span>
+                      )
                     }
-                    detalhe={<span className="muted">{refs.cf ? "referência" : "padrão"}</span>}
                   />
                 </div>
               )}
@@ -226,26 +237,24 @@ export function SummaryPage() {
                   <OpcaoInvestimento
                     id="inv-solar"
                     rotulo="Solar (GD / compensação)"
-                    disponivel={refs.solar !== undefined}
+                    disponivel={solar !== undefined}
                     marcado={incluir.solar}
                     onAlternar={() => alternar("solar")}
-                    resumo={
-                      refs.solar
-                        ? `${fmt(num(refs.solar, "potencia_cc_kwp") ?? 0)} kWp · CAPEX ${brl(num(refs.solar, "capex_r") ?? 0)}`
-                        : "Módulo solar não licenciado"
-                    }
+                    resumo={solar ? SOLAR.resumir(solar) : semDados("solar", "solar")}
+                    personalizado={investimentos.solar !== undefined}
+                    licenciado={temModulo("solar")}
+                    rota="/modulos/solar"
                   />
                   <OpcaoInvestimento
                     id="inv-bess"
                     rotulo="BESS de ponta"
-                    disponivel={refs.bess_ponta !== undefined}
+                    disponivel={bessPonta !== undefined}
                     marcado={incluir.bess_ponta}
                     onAlternar={() => alternar("bess_ponta")}
-                    resumo={
-                      refs.bess_ponta
-                        ? `${fmt(num(refs.bess_ponta, "energia_dod80_kwh") ?? 0, 1)} kWh úteis · CAPEX ${brl(num(refs.bess_ponta, "capex_r") ?? 0)}`
-                        : "Módulo bess_ponta não licenciado"
-                    }
+                    resumo={bessPonta ? BESS_PONTA.resumir(bessPonta) : semDados("bess_ponta", "bess_ponta")}
+                    personalizado={investimentos.bess_ponta !== undefined}
+                    licenciado={temModulo("bess_ponta")}
+                    rota="/modulos/bess_ponta"
                   />
                   {SEM_ENTRADA.map((m) => (
                     <div key={m.id} className="entrada off">
@@ -256,8 +265,8 @@ export function SummaryPage() {
                 </div>
                 {misturaCargaPropria && (
                   <p className="aviso" style={{ marginBottom: 0 }}>
-                    Solar e BESS de referência foram dimensionados para a planilha original, não para a sua
-                    carga. Use o resultado para explorar cenários, não como proposta.
+                    Investimentos com dados de referência foram dimensionados para a planilha original, não
+                    para a sua carga. Ajuste-os nas telas de solar e BESS antes de usar o resultado como proposta.
                   </p>
                 )}
               </section>
@@ -314,6 +323,9 @@ function OpcaoInvestimento(props: {
   marcado: boolean;
   onAlternar: () => void;
   resumo: string;
+  personalizado: boolean;
+  licenciado: boolean;
+  rota: string;
 }) {
   return (
     <div className={`entrada ${props.disponivel ? "" : "off"}`}>
@@ -328,6 +340,13 @@ function OpcaoInvestimento(props: {
         {props.rotulo}
       </label>
       <span className={props.disponivel ? "" : "muted"}>{props.resumo}</span>
+      <span className="entrada-detalhe">
+        {props.licenciado && (
+          <Link className="btn-link" to={props.rota}>
+            {props.personalizado ? "personalizado · editar" : props.disponivel ? "referência · editar" : "abrir tela"}
+          </Link>
+        )}
+      </span>
     </div>
   );
 }

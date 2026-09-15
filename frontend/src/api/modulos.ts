@@ -41,3 +41,10 @@ export function getExemploTarifas(): Promise<SimuladorTarifasPayload> {
 export function simularTarifas(payload: SimuladorTarifasPayload): Promise<SimuladorTarifasResumo> {
   return api.post<SimuladorTarifasResumo>("/modulos/grid/simular-tarifas", payload).then((r) => r.data);
 }
+
+// ── MOD 3/4/9 — Investimentos e parâmetros financeiros ──────────────────────
+export type ModuloInvestimento = "solar" | "bess_ponta" | "cf";
+
+export function validarModulo(modulo: ModuloInvestimento, payload: PayloadModulo): Promise<PayloadModulo> {
+  return api.post<PayloadModulo>(`/modulos/${modulo}/validar`, payload).then((r) => r.data);
+}

@@ -48,12 +48,13 @@ const RESUMO: SummaryResumo = {
     potencia_solar_kwp: 300, energia_bess_kwh: 1598.05,
   },
   custos: { opex_grid_anual: 210064.26, capex_total: 6411000 },
-  indicadores: { vpl: -7972861.6, tir_pct: null, payback: null, roi: -1.2436, viavel: false },
+  indicadores: { vpl: -6698746.18, tir_pct: null, payback: null, roi: -1.2436, viavel: false },
   modulos_ativos: { load: true, grid: true, solar: true, bess_ponta: true, cf: true, summary: true },
 };
 
 function renderPagina(opts: {
   licencas?: string[]; load?: EstudoValue["load"]; tarifas?: EstudoValue["tarifas"]; limparTarifas?: () => void;
+  investimentos?: EstudoValue["investimentos"];
 } = {}) {
   const licencas = opts.licencas ?? ["load", "grid", "cf", "solar", "bess_ponta", "summary"];
   const auth = {
@@ -64,6 +65,7 @@ function renderPagina(opts: {
   const estudo: EstudoValue = {
     load: opts.load ?? null, definirLoad: vi.fn(), limparLoad: vi.fn(),
     tarifas: opts.tarifas ?? null, definirTarifas: vi.fn(), limparTarifas: opts.limparTarifas ?? vi.fn(),
+    investimentos: opts.investimentos ?? {}, definirInvestimento: vi.fn(), limparInvestimento: vi.fn(),
   };
   return render(
     <AuthContext.Provider value={auth}>
@@ -164,6 +166,51 @@ describe("SummaryPage", () => {
     expect(screen.getByText(/consumo usado na fatura/)).toBeInTheDocument();
   });
 
+
+  it("usa solar e parâmetros financeiros salvos nas telas no lugar da referência", async () => {
+    const solarProprio = { ...EXEMPLOS.solar, potencia_cc_kwp: 150, capex_r: 450000 };
+    const cfProprio = { ...EXEMPLOS.cf, taxa_desconto: 0.12 };
+    renderPagina({
+      load: { payload: LOAD_USUARIO, fonte: "Memória de massa · cliente.csv" },
+      investimentos: { solar: solarProprio, cf: cfProprio },
+    });
+    const botao = await screen.findByRole("button", { name: "Calcular estudo" });
+    expect(screen.getByText(/150 kWp · CAPEX R\$\s450\.000/)).toBeInTheDocument();
+    expect(screen.getByText("Desconto 12% a.a. · 25 anos")).toBeInTheDocument();
+    // BESS continua de referência → aviso de mistura com a carga do usuário continua.
+    expect(screen.getByText(/Investimentos com dados de referência/)).toBeInTheDocument();
+
+    fireEvent.click(botao);
+    await screen.findByText("Estudo não viável");
+    const payload = api.calcularEstudo.mock.calls[0][0];
+    expect(payload.solar).toEqual(solarProprio);
+    expect(payload.params_cf).toEqual(cfProprio);
+    expect(payload.bess_ponta).toEqual(EXEMPLOS.bess_ponta);
+  });
+
+  it("ignora investimento salvo quando o módulo não está licenciado", async () => {
+    renderPagina({
+      licencas: ["load", "grid", "cf", "summary"],
+      investimentos: { solar: { ...EXEMPLOS.solar, potencia_cc_kwp: 150 } },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Calcular estudo" }));
+    await screen.findByText("Estudo não viável");
+    expect(api.calcularEstudo.mock.calls[0][0].solar).toBeNull();
+  });
+
+  it("falha ao buscar a referência não descarta o solar salvo nem se passa por falta de licença", async () => {
+    api.getExemploModulo.mockImplementation((m: string) =>
+      m === "solar" || m === "bess_ponta" ? Promise.reject(new Error("503")) : Promise.resolve(EXEMPLOS[m]));
+    const solarProprio = { ...EXEMPLOS.solar, potencia_cc_kwp: 150 };
+    renderPagina({ investimentos: { solar: solarProprio } });
+    fireEvent.click(await screen.findByRole("button", { name: "Calcular estudo" }));
+    await screen.findByText("Estudo não viável");
+    expect(screen.getByText(/Referência indisponível/)).toBeInTheDocument();
+    expect(screen.queryByText(/não licenciado/)).not.toBeInTheDocument();
+    const payload = api.calcularEstudo.mock.calls[0][0];
+    expect(payload.solar).toEqual(solarProprio);
+    expect(payload.bess_ponta).toBeNull();
+  });
 
   it("não envia o investimento desmarcado", async () => {
     renderPagina();

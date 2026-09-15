@@ -7,6 +7,8 @@ import { CallbackPage } from "./pages/CallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { GridPage } from "./pages/modulos/GridPage";
+import { InvestimentoPage } from "./pages/modulos/InvestimentoPage";
+import { BESS_PONTA, CF, SOLAR } from "./pages/modulos/investimentos";
 import { LoadPage } from "./pages/modulos/LoadPage";
 import { SummaryPage } from "./pages/modulos/SummaryPage";
 
@@ -50,6 +52,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {[SOLAR, BESS_PONTA, CF].map((cfg) => (
+            <Route
+              key={cfg.modulo}
+              path={`/modulos/${cfg.modulo}`}
+              element={
+                <ProtectedRoute modulo={cfg.modulo}>
+                  <InvestimentoPage key={cfg.modulo} cfg={cfg} />
+                </ProtectedRoute>
+              }
+            />
+          ))}
           <Route
             path="/modulos/summary"
             element={

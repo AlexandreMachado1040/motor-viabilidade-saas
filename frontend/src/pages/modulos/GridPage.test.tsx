@@ -66,7 +66,8 @@ const LOAD: InputLoadPayload = {
 function renderPagina(load: EstudoValue["load"] = null, extra: Partial<EstudoValue> = {}) {
   const estudo: EstudoValue = {
     load, definirLoad: vi.fn(), limparLoad: vi.fn(),
-    tarifas: null, definirTarifas: vi.fn(), limparTarifas: vi.fn(), ...extra,
+    tarifas: null, definirTarifas: vi.fn(), limparTarifas: vi.fn(),
+    investimentos: {}, definirInvestimento: vi.fn(), limparInvestimento: vi.fn(), ...extra,
   };
   return render(
     <EstudoContext.Provider value={estudo}>

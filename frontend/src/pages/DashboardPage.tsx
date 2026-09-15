@@ -6,6 +6,9 @@ import { DEMO_MODE } from "../config";
 const FRONTS: Record<string, string> = {
   load: "/modulos/load",
   grid: "/modulos/grid",
+  solar: "/modulos/solar",
+  bess_ponta: "/modulos/bess_ponta",
+  cf: "/modulos/cf",
   summary: "/modulos/summary",
 };
 
