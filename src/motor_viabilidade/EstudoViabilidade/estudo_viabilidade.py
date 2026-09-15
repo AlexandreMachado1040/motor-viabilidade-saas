@@ -168,7 +168,8 @@ class EstudoViabilidade:
     # ── OPEX Solar ────────────────────────────────────────────────────
     def calcular_opex_solar(self) -> dict:
         assert self.solar and self.grid
-        opex_e = self.solar.calcular_opex_energia_mensal(self.grid)
+        consumo_fp = self.load.energia_fp_kwh if self.load else None
+        opex_e = self.solar.calcular_opex_energia_mensal(self.grid, consumo_fp)
         opex_d = self.solar.calcular_opex_demanda_mensal(self.grid)
         return {
             "mensal_energia": opex_e, "mensal_demanda": opex_d,
@@ -189,11 +190,19 @@ class EstudoViabilidade:
         cf_g = calc.cf_grid(opex_g["fp_energia"], opex_g["p_energia"], opex_g["fp_demanda"])
         self._resultados["cf_grid"] = cf_g
 
+        # Economias ano a ano: degradação/capacidade e Fio B do ano de operação,
+        # reajustadas pela mesma taxa do posto usada no baseline (cf_grid).
+        # Até 15/09 eram um valor do ano 1 repetido pelos 25 anos.
+        p_cf = self.params_cf
         if self.solar and self.lic.solar:
-            opex_s = self.calcular_opex_solar()
+            solar, consumo_fp = self.solar, self.load.energia_fp_kwh
+            saving_solar = calc.serie_reajustada(
+                lambda a: -sum(solar.calcular_opex_energia_mensal(self.grid, consumo_fp, a)),
+                p_cf.reajuste_tarifa_fp,
+            )
             cf_s = calc.cf_solar_scdee(
                 capex=self.solar.capex_r, om=self.solar.om_anual_r,
-                saving_fp_energia=-opex_s["anual_energia"],
+                saving_fp_energia=saving_solar,
                 custo_troca_inv=self.solar.custo_troca_inversor_r,
                 ano_troca=self.solar.ano_troca_inversor,
             )
@@ -201,9 +210,11 @@ class EstudoViabilidade:
             self._resultados["cf_solar"] = cf_s
 
         if self.bess_ponta and self.lic.bess_ponta:
-            opex_carga = self.bess_ponta.calcular_opex_fp_energia(
-                self.load.demanda_kw, self.bess_ponta.potencia_max_carga_kw, self.grid)
-            saving_p = self.bess_ponta.calcular_saving_ponta(self.load.demanda_kw, self.grid)
+            bess, energia_ponta = self.bess_ponta, self.load.energia_ponta_kwh
+            opex_carga = calc.serie_reajustada(
+                lambda a: bess.calcular_opex_fp_energia(energia_ponta, self.grid, a), p_cf.reajuste_tarifa_fp)
+            saving_p = calc.serie_reajustada(
+                lambda a: bess.calcular_saving_ponta(energia_ponta, self.grid, a), p_cf.reajuste_tarifa_ponta)
             cf_bp = calc.cf_bess_ponta(
                 capex=self.bess_ponta.capex_r,
                 custo_reposicao=self.bess_ponta.custo_reposicao_r,

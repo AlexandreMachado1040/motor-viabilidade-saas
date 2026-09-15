@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ..common import DIAS_UTEIS_MES
+
 if TYPE_CHECKING:
     from ..InputGrid import InputGrid
 
@@ -45,25 +47,61 @@ class InputBESSPonta:
     energia_dod100_pos_pcs:  float = 1919.66
     tempo_carga_h:           float = 7.006
     tempo_descarga_h:        float = 7.006
+    horas_ponta:             float = 3.0
 
     def energia_eol_dod80_kwh(self) -> float:
         return self.energia_dod80_kwh * self.percentual_eol
 
-    def calcular_opex_fp_energia(
-        self, demanda_kw: list[list[float]], potencia_max_kw: float, grid: "InputGrid"
-    ) -> float:
-        total = 0.0
-        for m in range(12):
-            energia_carga = potencia_max_kw * self.tempo_carga_h / self.eta_total
-            total += energia_carga * grid.tarifa_fp
-        return total
+    def fator_capacidade(self, ano_operacao: int) -> float:
+        """Capacidade útil no ano, relativa à nova.
 
-    def calcular_saving_ponta(self, demanda_kw: list[list[float]], grid: "InputGrid") -> float:
-        total = 0.0
-        for m in range(12):
-            energia_descarga = self.potencia_max_descarga_kw * self.tempo_descarga_h
-            total += energia_descarga * grid.tarifa_ponta
-        return total
+        Queda linear de 100% no 1º ano até ``percentual_eol`` no último ano
+        antes da reposição (ano ``tempo_reposicao_anos``); a reposição devolve
+        100% no ano seguinte. Uma reposição só,
+        como em CalculadoraCF.cf_bess_ponta — depois dela a capacidade não
+        volta a ser renovada.
+        """
+        if ano_operacao < 1 or self.tempo_reposicao_anos <= 0:
+            return 1.0
+        idade = ano_operacao - 1
+        if ano_operacao > self.tempo_reposicao_anos:
+            idade -= self.tempo_reposicao_anos
+        passos = max(self.tempo_reposicao_anos - 1, 1)
+        queda = (1 - self.percentual_eol) * min(idade, passos) / passos
+        return max(self.percentual_eol, 1 - queda)
+
+    def energia_descarga_ponta_mensal_kwh(
+        self, energia_ponta_kwh: list[float], ano_operacao: int = 0,
+    ) -> list[float]:
+        """Energia que o BESS abate na ponta, por mês.
+
+        Um ciclo por dia útil, limitado pelo que cabe no posto (potência ×
+        horas de ponta), pela energia útil após o PCS (degradada no ano), pelo
+        que dá para recarregar (potência de carga × tempo de carga × eficiência)
+        e pelo consumo de ponta do mês — o BESS não descarrega mais do que a
+        carga consome na ponta. Até 15/09 o motor contava um único ciclo por
+        mês, sem nenhum desses limites.
+        """
+        por_dia = min(
+            self.potencia_max_descarga_kw * self.horas_ponta,
+            self.energia_dod80_pos_pcs * self.fator_capacidade(ano_operacao),
+            self.potencia_max_carga_kw * self.tempo_carga_h * self.eta_total,
+        )
+        return [min(por_dia * DIAS_UTEIS_MES[m], energia_ponta_kwh[m]) for m in range(12)]
+
+    def calcular_opex_fp_energia(
+        self, energia_ponta_kwh: list[float], grid: "InputGrid", ano_operacao: int = 0,
+    ) -> float:
+        """Custo anual de recarregar fora ponta o que foi descarregado (com perdas)."""
+        return sum(e / self.eta_total * grid.tarifa_fp
+                   for e in self.energia_descarga_ponta_mensal_kwh(energia_ponta_kwh, ano_operacao))
+
+    def calcular_saving_ponta(
+        self, energia_ponta_kwh: list[float], grid: "InputGrid", ano_operacao: int = 0,
+    ) -> float:
+        """Economia anual de energia na ponta (TUSD + TE ponta), sem reajuste."""
+        return sum(e * grid.tarifa_ponta
+                   for e in self.energia_descarga_ponta_mensal_kwh(energia_ponta_kwh, ano_operacao))
 
 
 __all__ = ["InputBESSPonta"]

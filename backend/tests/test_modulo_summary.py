@@ -104,7 +104,12 @@ def test_validar_cenario_completo_bate_com_motor_direto(client, db_session, usua
     assert body["projeto"]["demanda_maxima_kw"] == pytest.approx(238.56)
     assert body["projeto"]["potencia_solar_kwp"] == pytest.approx(300.0)
     assert body["custos"]["capex_total"] == pytest.approx(6_411_000.0)
-    assert body["indicadores"]["vpl"] == pytest.approx(-7_972_861.60, abs=1)
+    # Até 15/09 era −7.972.861,60: o motor contava 1 dia de geração solar e 1
+    # ciclo de BESS por mês. Com dias do mês, ciclos em dias úteis e limites
+    # de consumo, e com economias ano a ano (degradação, Fio B por ano,
+    # reajuste tarifário): −6.698.746,18 (BESS de R$ 5,5 mi para ~200 kWh/dia
+    # de ponta).
+    assert body["indicadores"]["vpl"] == pytest.approx(-6_698_746.18, abs=1)
     assert body["indicadores"]["tir_pct"] is None
     assert body["indicadores"]["payback"] is None
     assert body["indicadores"]["viavel"] is False
@@ -143,7 +148,7 @@ def test_validar_com_fatura_do_simulador_muda_baseline_e_vpl(client, db_session,
     assert body["projeto"]["modalidade"] == "Verde"
     assert body["projeto"]["fonte_tarifas"] == "simulador"
     assert body["custos"]["opex_grid_anual"] == pytest.approx(custo_verde)
-    assert body["indicadores"]["vpl"] != pytest.approx(-7_972_861.60, abs=1)
+    assert body["indicadores"]["vpl"] != pytest.approx(-6_698_746.18, abs=1)
 
 
 def test_validar_sem_tarifas_mantem_fonte_grid(client, db_session, usuario):

@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+from ..common import DIAS_NO_MES
 
 if TYPE_CHECKING:
     from ..InputGrid import InputGrid
@@ -44,27 +46,55 @@ class InputSolarSCDEE:
 
     @property
     def periodo_transicao_vigente(self) -> float:
+        return self.fracao_transicao(self.data_estudo_ano)
+
+    def fracao_transicao(self, ano_calendario: int) -> float:
+        """Fração do Fio B não compensada no ano (cronograma da Lei 14.300)."""
         for a in sorted(self.cronograma_transicao.keys(), reverse=True):
-            if self.data_estudo_ano >= a:
+            if ano_calendario >= a:
                 return self.cronograma_transicao[a]
         return 0.0
 
+    def fator_degradacao(self, ano_operacao: int) -> float:
+        """Fração da geração inicial no ano de operação (1 = primeiro ano)."""
+        if ano_operacao < 1:
+            return 1.0
+        return (1 - self.degradacao_ano1) * (1 - self.degradacao_demais) ** (ano_operacao - 1)
+
+    # A matriz 12×24 é o dia típico do mês (kW médio por hora): o mês é a
+    # soma das 24 horas × dias do mês. Até 15/09 o motor (e o legado em
+    # .docs/) devolvia só a soma das 24 horas — 1 dia por mês.
     def energia_injetada_mensal_kwh(self) -> list[float]:
-        return [abs(sum(self.potencia_injetada_kw[m]))
+        return [abs(sum(self.potencia_injetada_kw[m])) * DIAS_NO_MES[m]
                 if m < len(self.potencia_injetada_kw) else 0.0
                 for m in range(12)]
 
     def energia_gerada_mensal_kwh(self) -> list[float]:
-        return [sum(self.potencia_gerada_kw[m])
+        return [sum(self.potencia_gerada_kw[m]) * DIAS_NO_MES[m]
                 if m < len(self.potencia_gerada_kw) else 0.0
                 for m in range(12)]
 
-    def calcular_opex_energia_mensal(self, grid: "InputGrid") -> list[float]:
+    def calcular_opex_energia_mensal(
+        self, grid: "InputGrid", consumo_fp_kwh: Optional[list[float]] = None,
+        ano_operacao: int = 0,
+    ) -> list[float]:
+        """Economia mensal (negativa) da energia compensada, sem reajuste tarifário.
+
+        Com ``consumo_fp_kwh``, a compensação do mês fica limitada ao consumo
+        fora ponta: crédito além disso não reduz a fatura do mês (vira saldo
+        para meses seguintes, que o motor não modela). ``ano_operacao`` ≥ 1
+        aplica a degradação daquele ano e o Fio B do ano-calendário
+        correspondente (o ano 1 é ``data_estudo_ano``); 0 = geração nominal.
+        """
         result = []
-        energia_inj = self.energia_injetada_mensal_kwh()
-        ft = self.periodo_transicao_vigente
+        fator = self.fator_degradacao(ano_operacao)
+        energia_inj = [e * fator for e in self.energia_injetada_mensal_kwh()]
+        ano_cal = self.data_estudo_ano + max(ano_operacao, 1) - 1
+        ft = self.fracao_transicao(ano_cal)
         for m in range(12):
             e = energia_inj[m]
+            if consumo_fp_kwh is not None:
+                e = min(e, consumo_fp_kwh[m])
             economia = e * (grid.te_fp + grid.tusd_fp - ft * grid.tusd_fio_b_fp)
             result.append(-economia)
         return result

@@ -17,6 +17,23 @@ class CalculadoraCF:
     def _fator_reajuste(self, ano: int, taxa: float) -> float:
         return (1 + taxa) ** ano
 
+    def _operacional(self, valor: "float | list[float]") -> list[float]:
+        """Linha operacional [ano 0, 1..anos]: valor constante ou série anual.
+
+        Série anual tem um valor por ano de operação (1..anos) — é como as
+        economias entram com degradação, Fio B por ano e reajuste tarifário.
+        """
+        anos = self.p.anos_projeto
+        if isinstance(valor, (int, float)):
+            return [0.0] + [float(valor)] * anos
+        if len(valor) != anos:
+            raise ValueError(f"série anual deve ter {anos} anos (recebido: {len(valor)})")
+        return [0.0] + [float(v) for v in valor]
+
+    def serie_reajustada(self, valor_ano: "callable", taxa: float) -> list[float]:
+        """[valor_ano(a) × (1+taxa)^a para a = 1..anos] — mesma convenção de cf_grid."""
+        return [valor_ano(a) * self._fator_reajuste(a, taxa) for a in range(1, self.p.anos_projeto + 1)]
+
     def _descontar(self, valor: float, ano: int) -> float:
         if ano == 0:
             return valor
@@ -47,7 +64,7 @@ class CalculadoraCF:
                 -opex_fp_demanda * self._fator_reajuste(a, self.p.reajuste_demanda_spt))
         return cf
 
-    def cf_solar_scdee(self, capex: float, om: float, saving_fp_energia: float,
+    def cf_solar_scdee(self, capex: float, om: float, saving_fp_energia: "float | list[float]",
                        custo_troca_inv: float, ano_troca: int) -> dict:
         anos = self.p.anos_projeto
         cf = {
@@ -55,7 +72,7 @@ class CalculadoraCF:
             "REPLACEMENT": [0.0]*(anos+1),
             # Ano 0 = só o CAPEX (achado de auditoria 13/09 — ver cf_grid acima).
             "O&M": [0.0] + [-om]*anos,
-            "OPERATING_FP_ENERGIA": [0.0] + [saving_fp_energia]*anos,
+            "OPERATING_FP_ENERGIA": self._operacional(saving_fp_energia),
             "OPERATING_P_ENERGIA": [0.0]*(anos+1),
             "OPERATING_FP_DEMANDA": [0.0]*(anos+1),
         }
@@ -64,15 +81,15 @@ class CalculadoraCF:
         return cf
 
     def cf_bess_ponta(self, capex: float, custo_reposicao: float, ano_reposicao: int,
-                      opex_fp_carga: float, saving_ponta: float) -> dict:
+                      opex_fp_carga: "float | list[float]", saving_ponta: "float | list[float]") -> dict:
         anos = self.p.anos_projeto
         cf = {
             "CAPITAL": [-capex] + [0.0]*anos,
             "REPLACEMENT": [0.0]*(anos+1),
             "O&M": [0.0]*(anos+1),
             # Ano 0 = só o CAPEX (achado de auditoria 13/09 — ver cf_grid acima).
-            "OPERATING_FP_ENERGIA": [0.0] + [-opex_fp_carga]*anos,
-            "OPERATING_P_ENERGIA": [0.0] + [saving_ponta]*anos,
+            "OPERATING_FP_ENERGIA": [-v for v in self._operacional(opex_fp_carga)],
+            "OPERATING_P_ENERGIA": self._operacional(saving_ponta),
             "OPERATING_FP_DEMANDA": [0.0]*(anos+1),
         }
         if 0 < ano_reposicao <= anos:

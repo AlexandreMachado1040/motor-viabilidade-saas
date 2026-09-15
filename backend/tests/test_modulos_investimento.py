@@ -53,8 +53,10 @@ def test_solar_validar_calcula_energia_gerada_e_injetada(client, db_session, usu
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["energia_gerada_mensal_kwh"][0] == 240.0    # 24h * 10kW
-    assert body["energia_injetada_mensal_kwh"][0] == 240.0  # abs(-240)
+    # Dia típico: 24h × 10 kW = 240 kWh/dia; janeiro tem 31 dias, fevereiro 28.
+    assert body["energia_gerada_mensal_kwh"][0] == 240.0 * 31
+    assert body["energia_injetada_mensal_kwh"][0] == 240.0 * 31  # abs(-240) × 31
+    assert body["energia_gerada_mensal_kwh"][1] == 240.0 * 28
 
 
 def test_solar_bloqueado_sem_licenca(client, usuario):
