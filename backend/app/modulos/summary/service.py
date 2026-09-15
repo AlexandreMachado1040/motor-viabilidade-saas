@@ -24,7 +24,9 @@ from ...integracao.motor import (
     get_input_solar_scdee_cls,
     get_licenca_modulos_cls,
     get_params_cf_cls,
+    get_simulador_tarifas_mod,
 )
+from ..grid.tarifas_service import montar_entrada
 from ..load.service import _validar_estrutura as validar_estrutura_load
 from .schemas import SummaryPayload, SummaryResumo
 
@@ -60,6 +62,19 @@ def validar_summary(p: SummaryPayload) -> SummaryResumo | None:
     estudo = EstudoViabilidade(lic)
     estudo.carregar_load(InputLoad(**p.load.model_dump()))
     estudo.carregar_grid(InputGrid(**p.grid.model_dump()))
+
+    if p.tarifas is not None and p.modalidade is not None:
+        mod_tarifas = get_simulador_tarifas_mod()
+        if mod_tarifas is None:
+            return None
+        entrada = montar_entrada(mod_tarifas, p.tarifas)
+        erros = entrada.validar()
+        if erros:
+            return SummaryResumo(valido=False, erros=erros)
+        try:
+            estudo.carregar_fatura_grid(entrada, p.modalidade)
+        except ValueError as e:  # modalidade sem tarifa informada
+            return SummaryResumo(valido=False, erros=[str(e)])
 
     ParamsCF = get_params_cf_cls()
     if ParamsCF is not None:

@@ -9,7 +9,9 @@ grid obrigatórios — são a base de qualquer estudo, mesma ordem "1.load →
 opcionais, só entram no fluxo de caixa se enviados)."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
 
 from ..bess_form.schemas import InputBESSFormadorPayload
 from ..bess_ponta.schemas import InputBESSPontaPayload
@@ -17,6 +19,7 @@ from ..cf.schemas import ParamsCFPayload
 from ..gen_form.schemas import InputGeradorFormadorPayload
 from ..gen_ponta.schemas import InputGeradorPontaPayload
 from ..grid.schemas import InputGridPayload
+from ..grid.tarifas_schemas import SimuladorTarifasPayload
 from ..load.schemas import InputLoadPayload
 from ..new_grid.schemas import InputNewGridPayload
 from ..solar.schemas import InputSolarSCDEEPayload
@@ -26,6 +29,12 @@ class SummaryPayload(BaseModel):
     load: InputLoadPayload
     grid: InputGridPayload
     params_cf: ParamsCFPayload = Field(default_factory=ParamsCFPayload)
+
+    # Fatura do simulador de tarifas (MOD 2), opcional: quando enviada, a
+    # modalidade escolhida vira o baseline da rede e as tarifas de consumo
+    # usadas pelos investimentos (EstudoViabilidade.carregar_fatura_grid).
+    tarifas:    SimuladorTarifasPayload | None = None
+    modalidade: Literal["convencional", "azul", "verde", "baixa_tensao"] | None = None
 
     # Módulos de investimento — opcionais, só entram no fluxo de caixa
     # consolidado (VPL/TIR/payback) se enviados. `None` = módulo não
@@ -38,10 +47,18 @@ class SummaryPayload(BaseModel):
     bess_form:  InputBESSFormadorPayload | None = None
     new_grid:   InputNewGridPayload | None = None
 
+    @model_validator(mode="after")
+    def _tarifas_com_modalidade(self) -> "SummaryPayload":
+        if (self.tarifas is None) != (self.modalidade is None):
+            raise ValueError("tarifas e modalidade devem ser enviadas juntas.")
+        return self
+
 
 class ProjetoResumo(BaseModel):
     concessionaria:     str | None = None
     subgrupo:           str | None = None
+    modalidade:         str | None = None
+    fonte_tarifas:      Literal["grid", "simulador"] | None = None
     demanda_maxima_kw:  float | None = None
     potencia_solar_kwp: float | None = None
     energia_bess_kwh:   float | None = None

@@ -63,8 +63,11 @@ const LOAD: InputLoadPayload = {
   energia_fp_kwh: doze(22222),
 };
 
-function renderPagina(load: EstudoValue["load"] = null) {
-  const estudo: EstudoValue = { load, definirLoad: vi.fn(), limparLoad: vi.fn() };
+function renderPagina(load: EstudoValue["load"] = null, extra: Partial<EstudoValue> = {}) {
+  const estudo: EstudoValue = {
+    load, definirLoad: vi.fn(), limparLoad: vi.fn(),
+    tarifas: null, definirTarifas: vi.fn(), limparTarifas: vi.fn(), ...extra,
+  };
   return render(
     <EstudoContext.Provider value={estudo}>
       <MemoryRouter>
@@ -169,6 +172,32 @@ describe("GridPage", () => {
     renderPagina();
     fireEvent.click(await screen.findByRole("button", { name: "Simular modalidades" }));
     expect(await screen.findByText("consumo_fp_kwh não pode ter valor negativo.")).toBeInTheDocument();
+  });
+
+  it("leva ao estudo a modalidade escolhida com o payload simulado", async () => {
+    const definirTarifas = vi.fn();
+    renderPagina(null, { definirTarifas });
+    fireEvent.click(await screen.findByRole("button", { name: "Simular modalidades" }));
+    await screen.findByText("Modalidade recomendada: Convencional");
+
+    const select = screen.getByLabelText("Modalidade");
+    expect(select).toHaveValue("convencional");
+    fireEvent.change(select, { target: { value: "azul" } });
+    fireEvent.click(screen.getByRole("button", { name: "Usar no estudo" }));
+
+    expect(definirTarifas).toHaveBeenCalledWith({
+      payload: api.simularTarifas.mock.calls[0][0],
+      modalidade: "azul", nome: "Azul", custoAnual: 106617.98,
+      fonte: "Exemplo da planilha Simulador de Tarifas",
+    });
+  });
+
+  it("editar depois de simular esconde a opção de usar no estudo", async () => {
+    renderPagina();
+    fireEvent.click(await screen.findByRole("button", { name: "Simular modalidades" }));
+    await screen.findByRole("button", { name: "Usar no estudo" });
+    fireEvent.change(screen.getByLabelText("Demanda fora ponta (kW) · Mar"), { target: { value: "88" } });
+    expect(screen.queryByRole("button", { name: "Usar no estudo" })).not.toBeInTheDocument();
   });
 
   it("no modo demonstração avisa e não chama o backend", async () => {

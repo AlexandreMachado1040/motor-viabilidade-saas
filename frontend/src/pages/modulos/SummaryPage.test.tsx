@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext } from "../../auth/AuthContext";
 import { EstudoContext } from "../../estudo/EstudoContext";
-import type { InputLoadPayload, SummaryResumo } from "../../types";
+import type { InputLoadPayload, SimuladorTarifasPayload, SummaryResumo } from "../../types";
 
 const api = vi.hoisted(() => ({
   getExemploLoad: vi.fn(),
@@ -52,7 +52,9 @@ const RESUMO: SummaryResumo = {
   modulos_ativos: { load: true, grid: true, solar: true, bess_ponta: true, cf: true, summary: true },
 };
 
-function renderPagina(opts: { licencas?: string[]; load?: EstudoValue["load"] } = {}) {
+function renderPagina(opts: {
+  licencas?: string[]; load?: EstudoValue["load"]; tarifas?: EstudoValue["tarifas"]; limparTarifas?: () => void;
+} = {}) {
   const licencas = opts.licencas ?? ["load", "grid", "cf", "solar", "bess_ponta", "summary"];
   const auth = {
     usuario: null, modulos: {}, carregando: false, autenticado: true,
@@ -61,6 +63,7 @@ function renderPagina(opts: { licencas?: string[]; load?: EstudoValue["load"] } 
   } as AuthValue;
   const estudo: EstudoValue = {
     load: opts.load ?? null, definirLoad: vi.fn(), limparLoad: vi.fn(),
+    tarifas: opts.tarifas ?? null, definirTarifas: vi.fn(), limparTarifas: opts.limparTarifas ?? vi.fn(),
   };
   return render(
     <AuthContext.Provider value={auth}>
@@ -110,6 +113,57 @@ describe("SummaryPage", () => {
     await screen.findByText("Estudo não viável");
     expect(api.calcularEstudo.mock.calls[0][0].load).toEqual(LOAD_USUARIO);
   });
+
+  it("envia a fatura do simulador quando há modalidade escolhida", async () => {
+    const tarifas = {
+      payload: { consumo_ponta_kwh: Array(12).fill(5), consumo_fp_kwh: Array(12).fill(5) } as unknown as SimuladorTarifasPayload,
+      modalidade: "verde" as const, nome: "Verde", custoAnual: 157052.05, fonte: "Exemplo",
+    };
+    const limparTarifas = vi.fn();
+    renderPagina({ tarifas, limparTarifas });
+    const botao = await screen.findByRole("button", { name: "Calcular estudo" });
+    expect(screen.getByText(/Simulador · Verde · R\$\s157\.052\/ano/)).toBeInTheDocument();
+
+    expect(screen.getByText(/consumo usado na fatura do simulador \(Exemplo\) é diferente/)).toBeInTheDocument();
+    fireEvent.click(botao);
+    await screen.findByText("Estudo não viável");
+    const payload = api.calcularEstudo.mock.calls[0][0];
+    expect(payload.tarifas).toEqual(tarifas.payload);
+    expect(payload.modalidade).toBe("verde");
+
+    fireEvent.click(screen.getByRole("button", { name: "Usar referência" }));
+    expect(limparTarifas).toHaveBeenCalled();
+  });
+
+  it("não avisa quando o consumo da fatura bate com a carga, mesmo com outra fonte", async () => {
+    renderPagina({
+      load: { payload: LOAD_USUARIO, fonte: "Memória de massa · cliente.csv" },
+      tarifas: {
+        payload: {
+          consumo_ponta_kwh: [...LOAD_USUARIO.energia_ponta_kwh],
+          consumo_fp_kwh: LOAD_USUARIO.energia_fp_kwh.map((v) => v + 0.2),
+        } as unknown as SimuladorTarifasPayload,
+        modalidade: "azul", nome: "Azul", custoAnual: 1, fonte: "Outro nome",
+      },
+    });
+    await screen.findByRole("button", { name: "Calcular estudo" });
+    expect(screen.queryByText(/consumo usado na fatura/)).not.toBeInTheDocument();
+  });
+
+  it("avisa quando o consumo foi editado mesmo com a mesma fonte", async () => {
+    const editado = [...LOAD_USUARIO.energia_fp_kwh];
+    editado[3] = 9999;
+    renderPagina({
+      load: { payload: LOAD_USUARIO, fonte: "Memória de massa · cliente.csv" },
+      tarifas: {
+        payload: { consumo_ponta_kwh: LOAD_USUARIO.energia_ponta_kwh, consumo_fp_kwh: editado } as unknown as SimuladorTarifasPayload,
+        modalidade: "azul", nome: "Azul", custoAnual: 1, fonte: "Memória de massa · cliente.csv",
+      },
+    });
+    await screen.findByRole("button", { name: "Calcular estudo" });
+    expect(screen.getByText(/consumo usado na fatura/)).toBeInTheDocument();
+  });
+
 
   it("não envia o investimento desmarcado", async () => {
     renderPagina();

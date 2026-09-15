@@ -113,3 +113,61 @@ def test_validar_cenario_completo_bate_com_motor_direto(client, db_session, usua
         "gen_ponta": False, "gen_form": False, "bess_form": False,
         "new_grid": False, "cf": True, "summary": True, "gridzero": False,
     }
+
+
+# ── Fatura do simulador de tarifas como baseline ─────────────────────────────
+
+def _payload_referencia(client, usuario) -> dict:
+    h = auth_headers(usuario)
+    return {
+        "load": client.get("/modulos/load/exemplo", headers=h).json(),
+        "grid": client.get("/modulos/grid/exemplo", headers=h).json(),
+        "solar": client.get("/modulos/solar/exemplo", headers=h).json(),
+        "bess_ponta": client.get("/modulos/bess_ponta/exemplo", headers=h).json(),
+    }
+
+
+def test_validar_com_fatura_do_simulador_muda_baseline_e_vpl(client, db_session, usuario):
+    _licenciar(db_session, usuario, "summary", "load", "grid", "solar", "bess_ponta")
+    h = auth_headers(usuario)
+    payload = _payload_referencia(client, usuario)
+    tarifas = client.get("/modulos/grid/exemplo-tarifas", headers=h).json()
+    simulacao = client.post("/modulos/grid/simular-tarifas", json=tarifas, headers=h).json()
+    custo_verde = next(m["custo_anual"] for m in simulacao["modalidades"] if m["modalidade"] == "Verde")
+
+    r = client.post("/modulos/summary/validar",
+                    json={**payload, "tarifas": tarifas, "modalidade": "verde"}, headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valido"] is True
+    assert body["projeto"]["modalidade"] == "Verde"
+    assert body["projeto"]["fonte_tarifas"] == "simulador"
+    assert body["custos"]["opex_grid_anual"] == pytest.approx(custo_verde)
+    assert body["indicadores"]["vpl"] != pytest.approx(-7_972_861.60, abs=1)
+
+
+def test_validar_sem_tarifas_mantem_fonte_grid(client, db_session, usuario):
+    _licenciar(db_session, usuario, "summary", "load", "grid", "solar", "bess_ponta")
+    r = client.post("/modulos/summary/validar", json=_payload_referencia(client, usuario),
+                    headers=auth_headers(usuario))
+    assert r.json()["projeto"]["fonte_tarifas"] == "grid"
+
+
+def test_validar_rejeita_modalidade_sem_tarifa_informada(client, db_session, usuario):
+    _licenciar(db_session, usuario, "summary", "load", "grid", "solar", "bess_ponta")
+    h = auth_headers(usuario)
+    tarifas = client.get("/modulos/grid/exemplo-tarifas", headers=h).json()
+    r = client.post("/modulos/summary/validar",
+                    json={**_payload_referencia(client, usuario), "tarifas": tarifas, "modalidade": "baixa_tensao"},
+                    headers=h)
+    body = r.json()
+    assert body["valido"] is False
+    assert body["erros"] == ["Informe as tarifas da modalidade Baixa Tensão."]
+
+
+def test_validar_exige_tarifas_e_modalidade_juntas(client, db_session, usuario):
+    _licenciar(db_session, usuario, "summary", "load", "grid", "solar", "bess_ponta")
+    h = auth_headers(usuario)
+    r = client.post("/modulos/summary/validar",
+                    json={**_payload_referencia(client, usuario), "modalidade": "azul"}, headers=h)
+    assert r.status_code == 422

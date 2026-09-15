@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import replace
 from typing import Optional
 
 from ..common import log
@@ -22,6 +23,13 @@ from ..ParamsCF import ParamsCF
 from ..CalculadoraOPEXGrid import CalculadoraOPEXGrid
 from ..CalculadoraCF import CalculadoraCF
 from ..IntegradorSolarimetrico import IntegradorSolarimetrico
+from ..SimuladorTarifas import (
+    InputSimuladorTarifas,
+    ResultadoModalidade,
+    opex_grid_da_fatura,
+    simular_modalidade,
+    tarifas_medias_consumo,
+)
 from ..InputGridZero import (
     AnaliseComparativaGridZero,
     InputGridZero,
@@ -51,6 +59,9 @@ class EstudoViabilidade:
         self.solar_gen:   Optional[SolarHibridoParams]  = None
         self.new_grid:    Optional[InputNewGrid]        = None
         self.params_cf:   ParamsCF = ParamsCF()
+        # Fatura da modalidade escolhida no simulador de tarifas (opcional):
+        # quando presente, substitui o OPEX simplificado de CalculadoraOPEXGrid.
+        self.fatura_grid: Optional[tuple[ResultadoModalidade, InputSimuladorTarifas]] = None
         self._resultados: dict = {}
 
     # ── Carregamento ──────────────────────────────────────────────────
@@ -73,6 +84,26 @@ class EstudoViabilidade:
         self.grid = grid
         log.info(f"Grid carregado: {grid.concessionaria}/{grid.subgrupo}/"
                  f"{grid.modalidade}/{grid.ano_revisao}")
+
+    def carregar_fatura_grid(self, entrada: InputSimuladorTarifas, modalidade: str):
+        """Usa a fatura do simulador de tarifas como baseline da rede.
+
+        O OPEX da rede passa a ser a fatura da modalidade (contratada,
+        ultrapassagem e demanda por posto), e as tarifas de consumo do grid
+        viram as médias anuais dessa modalidade — é o que solar, BESS e
+        GridZero usam para calcular economia. Demais campos do grid
+        (fio B, demanda de geração etc.) continuam os carregados.
+        """
+        self.lic.requer("grid")
+        assert self.grid, "carregue o grid antes da fatura"
+        resultado = simular_modalidade(entrada, modalidade)
+        tarifa_ponta, tarifa_fp = tarifas_medias_consumo(resultado, entrada)
+        self.grid = replace(
+            self.grid, modalidade=resultado.modalidade,
+            tusd_ponta=tarifa_ponta, te_ponta=0.0, tusd_fp=tarifa_fp, te_fp=0.0,
+        )
+        self.fatura_grid = (resultado, entrada)
+        log.info(f"Fatura do simulador: {resultado.modalidade} · R$ {resultado.custo_anual:,.2f}/ano")
 
     def carregar_solar_scdee(self, solar: InputSolarSCDEE,
                               integrador: Optional[IntegradorSolarimetrico] = None):
@@ -114,6 +145,8 @@ class EstudoViabilidade:
     # ── OPEX Grid ─────────────────────────────────────────────────────
     def calcular_opex_grid(self) -> dict:
         assert self.load and self.grid
+        if self.fatura_grid:
+            return opex_grid_da_fatura(*self.fatura_grid)
         calc = CalculadoraOPEXGrid(self.load, self.grid)
         return {
             "mensal": {
@@ -283,6 +316,8 @@ class EstudoViabilidade:
             "projeto": {
                 "concessionaria":    self.grid.concessionaria if self.grid else None,
                 "subgrupo":          self.grid.subgrupo if self.grid else None,
+                "modalidade":        self.grid.modalidade if self.grid else None,
+                "fonte_tarifas":     "simulador" if self.fatura_grid else "grid",
                 "demanda_maxima_kw": self.load.demanda_maxima_kw if self.load else None,
                 "potencia_solar_kwp":self.solar.potencia_cc_kwp if self.solar else None,
                 "energia_bess_kwh":  self.bess_ponta.energia_dod80_kwh if self.bess_ponta else None,

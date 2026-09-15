@@ -28,6 +28,9 @@ const SEM_ENTRADA = [
   { id: "new_grid", rotulo: "Nova rede elétrica" },
 ];
 
+const mesmaSerie = (a: number[] | undefined, b: number[]) =>
+  a !== undefined && a.length === b.length && a.every((v, i) => Math.abs(v - (b[i] ?? 0)) < 0.5);
+
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -44,7 +47,7 @@ const texto = (o: PayloadModulo | undefined, campo: string): string | null => {
 
 export function SummaryPage() {
   const { temModulo } = useAuth();
-  const { load: loadUsuario } = useEstudo();
+  const { load: loadUsuario, tarifas: tarifasUsuario, limparTarifas } = useEstudo();
 
   const [refs, setRefs] = useState<Referencias>({});
   const [carregandoRefs, setCarregandoRefs] = useState(!DEMO_MODE);
@@ -85,6 +88,14 @@ export function SummaryPage() {
   const investimentosAtivos = (["solar", "bess_ponta"] as Investimento[])
     .filter((m) => incluir[m] && refs[m] !== undefined);
   const misturaCargaPropria = loadUsuario !== null && investimentosAtivos.length > 0;
+  // A fatura do simulador usa o consumo digitado lá; se ele não bate com a
+  // energia da carga do estudo (outra carga, edição manual, arquivo trocado),
+  // custo da rede e economia partem de dados diferentes. Compara os dados, não
+  // o nome da fonte.
+  const faturaDeOutraCarga = tarifasUsuario !== null && loadEfetivo !== undefined && !(
+    mesmaSerie(tarifasUsuario.payload.consumo_ponta_kwh, loadEfetivo.energia_ponta_kwh)
+    && mesmaSerie(tarifasUsuario.payload.consumo_fp_kwh, loadEfetivo.energia_fp_kwh)
+  );
 
   const faltando = useMemo(() => {
     const itens: string[] = [];
@@ -107,6 +118,10 @@ export function SummaryPage() {
       bess_ponta: incluir.bess_ponta && refs.bess_ponta ? refs.bess_ponta : null,
     };
     if (refs.cf) payload.params_cf = refs.cf;
+    if (tarifasUsuario) {
+      payload.tarifas = tarifasUsuario.payload;
+      payload.modalidade = tarifasUsuario.modalidade;
+    }
 
     setErro(null);
     setResultado(null);
@@ -167,11 +182,23 @@ export function SummaryPage() {
                   <Entrada
                     rotulo="Tarifas"
                     valor={
-                      refs.grid
-                        ? `${texto(refs.grid, "concessionaria")} · ${texto(refs.grid, "subgrupo")} · ${texto(refs.grid, "modalidade")}`
-                        : "Indisponível — módulo grid não licenciado"
+                      !refs.grid
+                        ? "Indisponível — módulo grid não licenciado"
+                        : tarifasUsuario
+                          ? `Simulador · ${tarifasUsuario.nome} · ${brl(tarifasUsuario.custoAnual)}/ano`
+                          : `${texto(refs.grid, "concessionaria")} · ${texto(refs.grid, "subgrupo")} · ${texto(refs.grid, "modalidade")}`
                     }
-                    detalhe={<span className="muted">referência</span>}
+                    detalhe={
+                      tarifasUsuario && refs.grid ? (
+                        <button type="button" className="btn-link" onClick={() => { limparTarifas(); setResultado(null); }}>
+                          Usar referência
+                        </button>
+                      ) : refs.grid && temModulo("grid") ? (
+                        <Link className="btn-link" to="/modulos/grid">Simular modalidades</Link>
+                      ) : (
+                        <span className="muted">referência</span>
+                      )
+                    }
                   />
                   <Entrada
                     rotulo="Parâmetros financeiros"
@@ -183,6 +210,12 @@ export function SummaryPage() {
                     detalhe={<span className="muted">{refs.cf ? "referência" : "padrão"}</span>}
                   />
                 </div>
+              )}
+              {!carregandoRefs && faturaDeOutraCarga && tarifasUsuario && (
+                <p className="aviso" style={{ marginBottom: 0 }}>
+                  O consumo usado na fatura do simulador ({tarifasUsuario.fonte}) é diferente da energia da carga
+                  deste estudo. Simule de novo com a mesma carga para custo da rede e economia baterem.
+                </p>
               )}
             </section>
 
@@ -332,6 +365,11 @@ function Resultado({ r }: { r: SummaryResumo }) {
         <dl>
           <dt>Concessionária</dt>
           <dd>{[r.projeto.concessionaria, r.projeto.subgrupo].filter(Boolean).join(" · ") || "—"}</dd>
+          <dt>Modalidade</dt>
+          <dd>
+            {r.projeto.modalidade ?? "—"}
+            {r.projeto.fonte_tarifas === "simulador" ? " · tarifas do simulador" : ""}
+          </dd>
           <dt>Demanda máxima</dt>
           <dd>{r.projeto.demanda_maxima_kw === null ? "—" : `${fmt(r.projeto.demanda_maxima_kw, 2)} kW`}</dd>
           <dt>Potência solar</dt>

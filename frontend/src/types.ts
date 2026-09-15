@@ -68,6 +68,8 @@ export type PayloadModulo = Record<string, unknown>;
 export interface SummaryPayload {
   load: InputLoadPayload;
   grid: PayloadModulo;
+  tarifas?: SimuladorTarifasPayload | null;
+  modalidade?: ModalidadeTarifaria | null;
   params_cf?: PayloadModulo;
   solar?: PayloadModulo | null;
   bess_ponta?: PayloadModulo | null;
@@ -79,6 +81,8 @@ export interface SummaryResumo {
   projeto: {
     concessionaria: string | null;
     subgrupo: string | null;
+    modalidade?: string | null;
+    fonte_tarifas?: "grid" | "simulador" | null;
     demanda_maxima_kw: number | null;
     potencia_solar_kwp: number | null;
     energia_bess_kwh: number | null;
@@ -121,6 +125,7 @@ export interface DiaDemanda {
 }
 
 // ── MOD 2 — Simulador de modalidades tarifárias ─────────────────────────────
+export type ModalidadeTarifaria = "convencional" | "azul" | "verde" | "baixa_tensao";
 export interface TarifasConvencional { demanda: number; consumo: number }
 export interface TarifasAzul {
   demanda_ponta: number; demanda_fp: number; consumo_ponta: number; consumo_fp: number;

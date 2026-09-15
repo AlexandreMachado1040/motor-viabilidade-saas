@@ -4,11 +4,11 @@ import { mensagemDeErro } from "../../api/erros";
 import { getExemploTarifas, simularTarifas } from "../../api/modulos";
 import { DEMO_MODE } from "../../config";
 import { useEstudo } from "../../estudo/useEstudo";
-import type { LoadDoEstudo } from "../../estudo/EstudoContext";
-import type { SimuladorTarifasPayload, SimuladorTarifasResumo } from "../../types";
+import type { LoadDoEstudo, TarifasDoEstudo } from "../../estudo/EstudoContext";
+import type { ModalidadeTarifaria, SimuladorTarifasPayload, SimuladorTarifasResumo } from "../../types";
 import { MESES, fmt } from "./loadUtils";
 
-type Modalidade = "convencional" | "azul" | "verde" | "baixa_tensao";
+type Modalidade = ModalidadeTarifaria;
 type SerieMensal = "demanda_ponta_kw" | "demanda_fp_kw" | "consumo_ponta_kwh" | "consumo_fp_kwh";
 
 const SERIES: { campo: SerieMensal; rotulo: string }[] = [
@@ -192,13 +192,15 @@ function montarPayload(form: Formulario): { payload?: SimuladorTarifasPayload; e
 }
 
 export function GridPage() {
-  const { load } = useEstudo();
+  const { load, tarifas: tarifasNoEstudo, definirTarifas } = useEstudo();
   const [exemplo, setExemplo] = useState<SimuladorTarifasPayload | null>(null);
   const [form, setForm] = useState<Formulario | null>(null);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [errosForm, setErrosForm] = useState<string[]>([]);
   const [simulando, setSimulando] = useState(false);
   const [resultado, setResultado] = useState<SimuladorTarifasResumo | null>(null);
+  // Payload exatamente como foi simulado — é o que segue para o estudo.
+  const [simulado, setSimulado] = useState<{ payload: SimuladorTarifasPayload; fonte: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -248,6 +250,7 @@ export function GridPage() {
     setSimulando(true);
     try {
       setResultado(await simularTarifas(payload));
+      setSimulado({ payload, fonte: form.fonte });
     } catch (e) {
       setErro(mensagemDeErro(e, "Falha inesperada ao simular as tarifas."));
     } finally {
@@ -425,10 +428,65 @@ export function GridPage() {
             </section>
 
             {resultado && <Resultado r={resultado} />}
+            {resultado?.valido && simulado && (
+              <UsarNoEstudo
+                r={resultado}
+                emUso={tarifasNoEstudo}
+                onUsar={(modalidade) => {
+                  const m = resultado.modalidades.find((x) => x.modalidade === CAMPOS[modalidade].rotulo);
+                  if (!m) return;
+                  definirTarifas({
+                    payload: simulado.payload, modalidade, nome: m.modalidade,
+                    custoAnual: m.custo_anual, fonte: simulado.fonte,
+                  });
+                }}
+              />
+            )}
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function UsarNoEstudo({ r, emUso, onUsar }: {
+  r: SimuladorTarifasResumo;
+  emUso: TarifasDoEstudo | null;
+  onUsar: (m: Modalidade) => void;
+}) {
+  const disponiveis = MODALIDADES.filter((m) => r.modalidades.some((x) => x.modalidade === CAMPOS[m].rotulo));
+  const recomendada = disponiveis.find((m) => CAMPOS[m].rotulo === r.recomendada) ?? disponiveis[0];
+  const [escolha, setEscolha] = useState<Modalidade | undefined>(recomendada);
+  if (!escolha) return null;
+  return (
+    <section className="painel">
+      <h3>Usar no Resumo do Estudo</h3>
+      <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+        A fatura da modalidade escolhida vira o custo da rede do estudo, e as tarifas médias de consumo dela
+        calculam a economia de solar e BESS.
+      </p>
+      <div className="acoes" style={{ marginTop: 0 }}>
+        <label className="campo" htmlFor="modalidade-estudo">
+          Modalidade
+          <select id="modalidade-estudo" value={escolha} onChange={(e) => setEscolha(e.target.value as Modalidade)}>
+            {disponiveis.map((m) => (
+              <option key={m} value={m}>
+                {CAMPOS[m].rotulo}{CAMPOS[m].rotulo === r.recomendada ? " (recomendada)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="btn btn-ms" onClick={() => onUsar(escolha)}>
+          Usar no estudo
+        </button>
+        {emUso && (
+          <span>
+            Em uso no estudo: <strong>{emUso.nome}</strong> ·{" "}
+            <Link className="btn-link" to="/modulos/summary">abrir o resumo</Link>
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -19,8 +19,8 @@ def _modulo():
     return mod
 
 
-def simular_tarifas(p: SimuladorTarifasPayload) -> SimuladorTarifasResumo:
-    mod = _modulo()
+def montar_entrada(mod, p: SimuladorTarifasPayload):
+    """Payload HTTP → motor_viabilidade.SimuladorTarifas.InputSimuladorTarifas."""
     dados = p.model_dump()
     classes = {
         "convencional": mod.TarifasConvencional,
@@ -31,7 +31,12 @@ def simular_tarifas(p: SimuladorTarifasPayload) -> SimuladorTarifasResumo:
     for campo, cls in classes.items():
         if dados[campo] is not None:
             dados[campo] = cls(**dados[campo])
-    entrada = mod.InputSimuladorTarifas(**dados)
+    return mod.InputSimuladorTarifas(**dados)
+
+
+def simular_tarifas(p: SimuladorTarifasPayload) -> SimuladorTarifasResumo:
+    mod = _modulo()
+    entrada = montar_entrada(mod, p)
 
     erros = entrada.validar()
     if erros:
@@ -43,4 +48,4 @@ def exemplo_tarifas() -> SimuladorTarifasPayload:
     return SimuladorTarifasPayload(**asdict(_modulo().exemplo_simulador_tarifas()))
 
 
-__all__ = ["simular_tarifas", "exemplo_tarifas"]
+__all__ = ["montar_entrada", "simular_tarifas", "exemplo_tarifas"]

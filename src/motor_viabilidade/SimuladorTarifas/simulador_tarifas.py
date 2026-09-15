@@ -113,6 +113,7 @@ class ResultadoModalidade:
     componentes: dict[str, float]
     ultrapassagem_anual: float
     meses_com_ultrapassagem: int
+    componentes_mensais: dict[str, list[float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -187,6 +188,7 @@ class SimuladorTarifas:
             componentes={k: sum(v) for k, v in linhas.items()},
             ultrapassagem_anual=sum(ultra),
             meses_com_ultrapassagem=sum(1 for u in ultra if u > 0),
+            componentes_mensais={k: list(v) for k, v in linhas.items()},
         )
 
     def convencional(self) -> Optional[ResultadoModalidade]:
@@ -275,6 +277,79 @@ class SimuladorTarifas:
         )
 
 
+# Identificador da modalidade na API → nome exibido no resultado.
+MODALIDADES = {
+    "convencional": "Convencional",
+    "azul": "Azul",
+    "verde": "Verde",
+    "baixa_tensao": "Baixa Tensão",
+}
+
+
+def simular_modalidade(entrada: InputSimuladorTarifas, modalidade: str) -> ResultadoModalidade:
+    """Fatura de uma modalidade só (a escolhida para o estudo)."""
+    if modalidade not in MODALIDADES:
+        raise ValueError(f"Modalidade desconhecida: {modalidade!r}.")
+    erros = entrada.validar()
+    if erros:
+        raise ValueError("; ".join(erros))
+    resultado = getattr(SimuladorTarifas(entrada), modalidade)()
+    if resultado is None:
+        raise ValueError(f"Informe as tarifas da modalidade {MODALIDADES[modalidade]}.")
+    return resultado
+
+
+def opex_grid_da_fatura(r: ResultadoModalidade, e: InputSimuladorTarifas) -> dict:
+    """Fatura da modalidade no formato de EstudoViabilidade.calcular_opex_grid().
+
+    Como a tarifa digitada é final (TUSD + TE juntas), o consumo vai inteiro
+    para as chaves ``tusd_*`` e ``te_*`` fica zerado. Nas modalidades de
+    tarifa única (Convencional, BT) o custo de consumo é repartido entre
+    ponta e fora ponta pela energia de cada posto. Demanda e ultrapassagem
+    somam em ``demanda_spt``.
+    """
+    cm = r.componentes_mensais
+    zero = [0.0] * 12
+    if "Consumo" in cm:
+        c_ponta, c_fp = [], []
+        for custo, p, f in zip(cm["Consumo"], e.consumo_ponta_kwh, e.consumo_fp_kwh):
+            parte = p / (p + f) if p + f > 0 else 0.0
+            c_ponta.append(custo * parte)
+            c_fp.append(custo - custo * parte)
+    else:
+        c_ponta, c_fp = cm.get("Consumo ponta", zero), cm.get("Consumo fora ponta", zero)
+    demanda = [sum(v[i] for k, v in cm.items() if not k.startswith("Consumo")) for i in range(12)]
+    total = [a + b + c for a, b, c in zip(c_ponta, c_fp, demanda)]
+    return {
+        "mensal": {
+            "tusd_ponta": c_ponta, "tusd_fp": c_fp, "te_ponta": zero, "te_fp": zero,
+            "demanda_spt": demanda, "total": total,
+        },
+        "anual": {
+            "fp_energia": sum(c_fp), "p_energia": sum(c_ponta),
+            "fp_demanda": sum(demanda), "total": sum(total),
+        },
+    }
+
+
+def tarifas_medias_consumo(r: ResultadoModalidade, e: InputSimuladorTarifas) -> tuple[float, float]:
+    """Tarifa média de consumo (R$/kWh) de ponta e fora ponta no ano.
+
+    Média ponderada pela energia, o que já absorve a tarifa úmida. Sem
+    energia no posto, vale a tarifa do período seco digitada.
+    """
+    anual = opex_grid_da_fatura(r, e)["anual"]
+    kwh_p, kwh_f = sum(e.consumo_ponta_kwh), sum(e.consumo_fp_kwh)
+    nome = next(k for k, v in MODALIDADES.items() if v == r.modalidade)
+    t = getattr(e, nome)
+    seco_p = getattr(t, "consumo_ponta", None) or getattr(t, "consumo", 0.0)
+    seco_f = getattr(t, "consumo_fp", None) or getattr(t, "consumo", 0.0)
+    return (
+        anual["p_energia"] / kwh_p if kwh_p > 0 else seco_p,
+        anual["fp_energia"] / kwh_f if kwh_f > 0 else seco_f,
+    )
+
+
 def exemplo_simulador_tarifas() -> InputSimuladorTarifas:
     """Dados da aba "Simulação anual" da planilha SIMULADOR TARIFAS ANUAL_V1.
 
@@ -305,4 +380,5 @@ __all__ = [
     "TarifasConvencional", "TarifasAzul", "TarifasVerde", "TarifasBaixaTensao",
     "InputSimuladorTarifas", "ResultadoModalidade", "DemandaSugerida", "ResultadoSimulacao",
     "SimuladorTarifas", "exemplo_simulador_tarifas",
+    "MODALIDADES", "simular_modalidade", "opex_grid_da_fatura", "tarifas_medias_consumo",
 ]

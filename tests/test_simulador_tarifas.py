@@ -140,3 +140,64 @@ def test_tarifa_de_demanda_zero_mantem_a_contratada_atual():
     sug = SimuladorTarifas(e).simular().demandas_sugeridas[0]
     assert sug.demanda_kw == 75.0
     assert sug.economia_anual == 0.0
+
+
+# ── Integração com o EstudoViabilidade ───────────────────────────────────────
+
+from motor_viabilidade.SimuladorTarifas import (  # noqa: E402
+    opex_grid_da_fatura,
+    simular_modalidade,
+    tarifas_medias_consumo,
+)
+
+
+def test_opex_da_fatura_reparte_consumo_unico_pela_energia_de_cada_posto():
+    e = _entrada(consumo_ponta_kwh=[100.0] * 12, consumo_fp_kwh=[300.0] * 12,
+                 demanda_fp_kw=[50.0] * 12, demanda_contratada_kw=50.0,
+                 convencional=TarifasConvencional(demanda=10.0, consumo=0.5))
+    r = simular_modalidade(e, "convencional")
+    opex = opex_grid_da_fatura(r, e)["anual"]
+    assert opex["p_energia"] == pytest.approx(12 * 50)
+    assert opex["fp_energia"] == pytest.approx(12 * 150)
+    assert opex["fp_demanda"] == pytest.approx(12 * 500)
+    assert opex["total"] == pytest.approx(r.custo_anual)
+    assert tarifas_medias_consumo(r, e) == (pytest.approx(0.5), pytest.approx(0.5))
+
+
+def test_tarifa_media_absorve_o_periodo_umido():
+    e = _entrada(consumo_ponta_kwh=[100.0] * 12,
+                 verde=TarifasVerde(demanda=0.0, consumo_ponta=1.0, consumo_fp=0.4, consumo_ponta_umido=2.0))
+    ponta, fp = tarifas_medias_consumo(simular_modalidade(e, "verde"), e)
+    assert ponta == pytest.approx((5 * 2.0 + 7 * 1.0) / 12)
+    assert fp == pytest.approx(0.4)  # sem energia fora ponta: vale a tarifa seca
+
+
+def test_simular_modalidade_rejeita_modalidade_sem_tarifa_ou_desconhecida():
+    e = exemplo_simulador_tarifas()
+    with pytest.raises(ValueError, match="Baixa Tensão"):
+        simular_modalidade(e, "baixa_tensao")
+    with pytest.raises(ValueError, match="desconhecida"):
+        simular_modalidade(e, "branca")
+
+
+def test_estudo_usa_a_fatura_como_baseline_e_as_tarifas_medias_nos_investimentos():
+    from motor_viabilidade.exemplos import exemplo_planilha_original
+
+    referencia = exemplo_planilha_original()
+    referencia.calcular_cf()
+
+    estudo = exemplo_planilha_original()
+    entrada = exemplo_simulador_tarifas()
+    estudo.carregar_fatura_grid(entrada, "azul")
+    resultado = estudo.calcular_cf()
+    resumo = estudo.gerar_summary()
+
+    azul = SimuladorTarifas(entrada).azul()
+    assert resumo["custos"]["opex_grid_anual"] == pytest.approx(azul.custo_anual)
+    assert resumo["projeto"]["modalidade"] == "Azul"
+    assert resumo["projeto"]["fonte_tarifas"] == "simulador"
+    tp, tf = tarifas_medias_consumo(azul, entrada)
+    assert estudo.grid.tarifa_ponta == pytest.approx(tp)
+    assert estudo.grid.tarifa_fp == pytest.approx(tf)
+    # Tarifas diferentes mudam a economia do solar/BESS e, portanto, o VPL.
+    assert resultado["vpl"] != referencia._resultados["cf_consolidado"]["vpl"]
